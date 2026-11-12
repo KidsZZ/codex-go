@@ -14,6 +14,9 @@ void main() {
     yield LicenseEntryWithLineBreaks([
       'Android-SSH-Codex',
     ], await rootBundle.loadString('assets/licenses/android-ssh-codex.txt'));
+    yield LicenseEntryWithLineBreaks([
+      'JetBrains Mono',
+    ], await rootBundle.loadString('assets/licenses/jetbrains-mono.txt'));
   });
   final runtime = CodexRuntime(store: SecureProfileStore());
   runApp(CodexGoApp(runtime: runtime));

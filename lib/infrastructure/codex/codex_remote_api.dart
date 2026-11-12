@@ -1017,6 +1017,8 @@ TaskItem? _parseItem(Map<String, dynamic> item) {
     'agentMessage' => TaskItemKind.agent,
     'commandExecution' => TaskItemKind.command,
     'fileChange' => TaskItemKind.file,
+    'functionCallOutput' ||
+    'webSearch' ||
     'mcpToolCall' ||
     'dynamicToolCall' ||
     'collabAgentToolCall' ||
@@ -1051,16 +1053,21 @@ TaskItem? _parseItem(Map<String, dynamic> item) {
     return null;
   }
   final presentation = _itemPresentation(type, item, text);
+  final activity = _activitySemantics(type, item);
   return TaskItem(
     id: id,
     kind: kind,
     title: presentation.title,
+    activityKind: activity.$1,
+    activityTarget: activity.$2,
     text: kind == TaskItemKind.user ? text : presentation.text,
     attachments: attachments,
     questions: List.unmodifiable(questions),
     subagents: _parseSubagents(type, item),
     detail: presentation.detail,
-    status: item['status']?.toString(),
+    status:
+        item['status']?.toString() ??
+        (item['success'] == false ? 'failed' : null),
     phase: item['phase'] as String?,
     startedAt: _parseItemTime(item['startedAtMs']),
     completedAt: _parseItemTime(item['completedAtMs']),
@@ -1073,6 +1080,52 @@ TaskItem? _parseItem(Map<String, dynamic> item) {
         ),
     ]),
   );
+}
+
+/// 多种动作合在同一命令中时保留“运行”，避免把整个命令错误归为读取。
+(TaskActivityKind?, String?) _activitySemantics(
+  String type,
+  Map<String, dynamic> item,
+) {
+  if (type == 'plan') return (TaskActivityKind.plan, null);
+  if (type == 'contextCompaction') return (TaskActivityKind.context, null);
+  if (type == 'webSearch') {
+    return (
+      TaskActivityKind.search,
+      _firstText(item['query'], _map(item['action'])['query']),
+    );
+  }
+  if (type == 'fileChange') {
+    final paths = (item['changes'] as List? ?? const [])
+        .map((c) => _map(c)['path'])
+        .whereType<String>();
+    return (null, paths.join(', '));
+  }
+  if (type != 'commandExecution') return (null, null);
+  final actions = (item['commandActions'] as List? ?? const [])
+      .map(_map)
+      .toList();
+  final types = actions.map((a) => a['type']).toSet();
+  if (types.length != 1) return (null, null);
+  final kind = switch (types.single) {
+    'read' => TaskActivityKind.read,
+    'search' => TaskActivityKind.search,
+    'listFiles' => TaskActivityKind.listFiles,
+    _ => null,
+  };
+  if (kind == null) return (null, null);
+  final targets = actions
+      .map(
+        (a) => kind == TaskActivityKind.search
+            ? [
+                _firstText(a['query']),
+                _firstText(a['path']),
+              ].whereType<String>().join(' · ')
+            : _firstText(a['path'], a['name']) ?? '',
+      )
+      .where((s) => s.isNotEmpty)
+      .toSet();
+  return (kind, targets.isEmpty ? null : targets.join(', '));
 }
 
 List<SubagentReference> _parseSubagents(
@@ -1116,6 +1169,25 @@ _ItemPresentation _itemPresentation(
   switch (type) {
     case 'agentMessage':
       return _ItemPresentation(text: extractedText);
+    case 'functionCallOutput':
+      return _ItemPresentation(
+        title: _firstText(item['name']) ?? type,
+        text: '',
+        detail: _readTextBlocks(item['output']).isNotEmpty
+            ? _readTextBlocks(item['output'])
+            : _jsonDetail(item, ['output']),
+      );
+    case 'webSearch':
+      return _ItemPresentation(
+        text: _firstText(item['query']) ?? extractedText,
+        detail: _jsonDetail(item, ['action', 'queries', 'result']),
+      );
+    case 'plan':
+      return _ItemPresentation(text: extractedText);
+    case 'contextCompaction':
+      return _ItemPresentation(
+        text: extractedText == type ? '' : extractedText,
+      );
     case 'reasoning':
       final summary = _readTextBlocks(item['summary']);
       final content = _readTextBlocks(item['content']);
@@ -1205,6 +1277,14 @@ _ItemPresentation _itemPresentation(
     default:
       return _ItemPresentation(
         text: extractedText.isEmpty ? type : extractedText,
+        detail: extractedText.isEmpty
+            ? _jsonDetail(
+                item,
+                item.keys
+                    .where((key) => !const {'id', 'type'}.contains(key))
+                    .toList(),
+              )
+            : null,
       );
   }
 }

@@ -19,6 +19,7 @@ dependencies:
   flutter_markdown_plus: 1.0.12
   flutter_secure_storage: 9.2.4
   markdown: 7.3.1
+  re_highlight: 0.0.3
   url_launcher: 6.3.1
   web_socket_channel: 3.0.1
 
@@ -30,3 +31,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/licenses/android-ssh-codex.txt
+    - assets/licenses/jetbrains-mono.txt
+  fonts:
+    - family: GoMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700

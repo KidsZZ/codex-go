@@ -8,8 +8,9 @@ sealed class TimelineEntry {
 }
 
 final class TimelineMessageEntry extends TimelineEntry {
-  const TimelineMessageEntry(this.item);
+  const TimelineMessageEntry(this.item, {this.showActions = true});
   final TaskItem item;
+  final bool showActions;
   @override
   String get key => 'message:${item.id}';
 }
@@ -39,12 +40,22 @@ final class TimelineChangesEntry extends TimelineEntry {
 List<TimelineEntry> buildTimelineEntries(List<TaskItem> items) {
   final result = <TimelineEntry>[];
   final lastAnswers = <String, String>{};
+  final lastMessages = <String, String>{};
   for (final item in items) {
     if (item.kind == TaskItemKind.agent &&
         item.turnId != null &&
-        item.phase != 'commentary') {
+        item.text.trim().isNotEmpty) {
+      lastMessages[item.turnId!] = item.id;
+    }
+    if (item.kind == TaskItemKind.agent &&
+        item.turnId != null &&
+        item.phase != 'commentary' &&
+        item.text.trim().isNotEmpty) {
       lastAnswers[item.turnId!] = item.id;
     }
+  }
+  for (final entry in lastMessages.entries) {
+    lastAnswers.putIfAbsent(entry.key, () => entry.value);
   }
   var segment = <TaskItem>[];
   void flush() {
@@ -61,7 +72,14 @@ List<TimelineEntry> buildTimelineEntries(List<TaskItem> items) {
             item.kind == TaskItemKind.agent &&
             (item.phase == 'final_answer' ||
                 lastAnswers[item.turnId] == item.id);
-        if (isAnswer ||
+        if (const {
+              'failed',
+              'declined',
+              'denied',
+              'errored',
+              'interrupted',
+            }.contains(item.status) ||
+            isAnswer ||
             item.attachments.isNotEmpty ||
             item.questions.isNotEmpty ||
             item.subagents.isNotEmpty ||
@@ -101,7 +119,16 @@ List<TimelineEntry> buildTimelineEntries(List<TaskItem> items) {
         if (item.text.trim().isNotEmpty ||
             item.attachments.isNotEmpty ||
             item.questions.isNotEmpty) {
-          result.add(TimelineMessageEntry(item));
+          result.add(
+            TimelineMessageEntry(
+              item,
+              showActions:
+                  item.kind == TaskItemKind.user ||
+                  item.turnId == null ||
+                  (lastAnswers[item.turnId] == item.id &&
+                      (item.phase != 'commentary' || turn?.completed == true)),
+            ),
+          );
         }
       } else {
         activities.add(item);

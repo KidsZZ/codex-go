@@ -515,5 +515,19 @@
   "goDeviceOnly": "安全保存在此设备",
   "goConnectionSecurity": "SSH 加密连接 · 主机指纹确认",
   "goNoWorkspacesMatch": "没有匹配的工作区",
-  "goNoWorkspacesMatchHint": "试试工作区名称或远端目录。"
+  "goNoWorkspacesMatchHint": "试试工作区名称或远端目录。",
+  "chatOptions": "对话设置",
+  "chatAwaitingYou": "等待确认",
+  "chatRead": "读取",
+  "chatSearch": "搜索",
+  "chatBrowse": "浏览",
+  "chatPlan": "计划",
+  "chatContext": "上下文",
+  "chatExecute": "运行",
+  "chatEdit": "编辑",
+  "chatEvent": "事件",
+  "chatCode": "代码",
+  "chatWrapCode": "自动换行",
+  "chatProcess": "执行过程",
+  "chatSelectText": "选择文本"
 }

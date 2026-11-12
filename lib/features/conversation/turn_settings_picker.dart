@@ -19,6 +19,7 @@ class TurnSettingsPicker extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.enabled = true,
+    this.compact = false,
     this.useCatalogDefault = true,
     this.inheritedServiceTier,
     this.accountUsage,
@@ -29,6 +30,7 @@ class TurnSettingsPicker extends StatelessWidget {
   final TurnSettings value;
   final ValueChanged<TurnSettings> onChanged;
   final bool enabled;
+  final bool compact;
   final bool useCatalogDefault;
   final String? inheritedServiceTier;
   final AccountUsageController? accountUsage;
@@ -60,6 +62,11 @@ class TurnSettingsPicker extends StatelessWidget {
         key: const Key('turn-settings-selector'),
         style: OutlinedButton.styleFrom(
           visualDensity: VisualDensity.compact,
+          minimumSize: Size(0, compact ? 36 : 44),
+          side: compact ? BorderSide.none : null,
+          textStyle: compact
+              ? Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 12)
+              : null,
           padding: const EdgeInsets.symmetric(horizontal: 10),
         ),
         onPressed: enabled && (models.isNotEmpty || accountUsage != null)

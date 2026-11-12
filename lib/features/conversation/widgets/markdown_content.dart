@@ -16,6 +16,8 @@ import 'package:codex_go/infrastructure/ports/port_forward.dart';
 import 'package:codex_go/shared/media/remote_port_link_scope.dart';
 import 'package:codex_go/l10n/strings.dart';
 
+import 'code_block.dart';
+
 typedef ExternalLinkOpener = Future<bool> Function(Uri uri);
 typedef MarkdownTextCopier = Future<void> Function(String text);
 
@@ -80,11 +82,15 @@ class MarkdownContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final codeTextStyle = theme.textTheme.bodyMedium?.copyWith(
-      fontFamily: 'monospace',
+      fontFamily: 'GoMono',
+      fontSize: 13.5,
+      height: 1.6,
     );
     return MarkdownBody(
       data: text,
       selectable: selectable,
+      shrinkWrap: true,
+      fitContent: true,
       extensionSet: md.ExtensionSet(
         [FormulaBlockSyntax(), ...md.ExtensionSet.gitHubFlavored.blockSyntaxes],
         [
@@ -94,10 +100,7 @@ class MarkdownContent extends StatelessWidget {
       ),
       builders: {
         'latex': FormulaElementBuilder(textStyle: theme.textTheme.bodyMedium),
-        'pre': CodeBlockElementBuilder(
-          copyText: copyText,
-          textStyle: codeTextStyle,
-        ),
+        'pre': CodeBlockElementBuilder(copyText: copyText),
       },
       onTapLink: (_, href, __) {
         if (href != null &&
@@ -160,12 +163,48 @@ class MarkdownContent extends StatelessWidget {
         return _BlockedImage(alt: alt);
       },
       styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
-        code: codeTextStyle?.copyWith(
-          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+        p: theme.textTheme.bodyLarge?.copyWith(
+          fontSize: 16,
+          height: 1.65,
+          letterSpacing: .1,
         ),
-        codeblockDecoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+        h1: theme.textTheme.titleLarge?.copyWith(
+          fontSize: 23,
+          height: 1.4,
+          fontWeight: FontWeight.w600,
+        ),
+        h2: theme.textTheme.titleLarge?.copyWith(
+          fontSize: 20,
+          height: 1.4,
+          fontWeight: FontWeight.w600,
+        ),
+        h3: theme.textTheme.titleMedium?.copyWith(
+          fontSize: 17,
+          height: 1.5,
+          fontWeight: FontWeight.w600,
+        ),
+        h1Padding: const EdgeInsets.only(top: 12, bottom: 4),
+        h2Padding: const EdgeInsets.only(top: 8, bottom: 2),
+        h3Padding: const EdgeInsets.only(top: 4),
+        blockSpacing: 12,
+        listIndent: 22,
+        listBullet: theme.textTheme.bodyLarge?.copyWith(
+          fontSize: 16,
+          height: 1.65,
+        ),
+        code: codeTextStyle?.copyWith(
+          backgroundColor: theme.colorScheme.onSurface.withValues(alpha: .045),
+        ),
+        codeblockPadding: EdgeInsets.zero,
+        codeblockDecoration: const BoxDecoration(),
+        blockquotePadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 4,
+        ),
+        blockquoteDecoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: theme.colorScheme.outlineVariant, width: 3),
+          ),
         ),
       ),
     );
@@ -173,88 +212,23 @@ class MarkdownContent extends StatelessWidget {
 }
 
 class CodeBlockElementBuilder extends MarkdownElementBuilder {
-  CodeBlockElementBuilder({required this.copyText, required this.textStyle});
-
+  CodeBlockElementBuilder({required this.copyText});
   final MarkdownTextCopier copyText;
-  final TextStyle? textStyle;
-
   @override
   bool isBlockElement() => true;
-
   @override
-  Widget? visitText(md.Text text, TextStyle? preferredStyle) {
-    return _CopyableCodeBlock(
-      text: text.text,
-      style: textStyle,
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final code = element.children
+        ?.whereType<md.Element>()
+        .where((e) => e.tag == 'code')
+        .firstOrNull;
+    final language = code?.attributes['class']?.replaceFirst('language-', '');
+    return ConversationCodeBlock(
+      key: const Key('markdown-code-block'),
+      code: element.textContent,
+      language: language,
       copyText: copyText,
     );
-  }
-}
-
-class _CopyableCodeBlock extends StatelessWidget {
-  const _CopyableCodeBlock({
-    required this.text,
-    required this.style,
-    required this.copyText,
-  });
-
-  final String text;
-  final TextStyle? style;
-  final MarkdownTextCopier copyText;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      key: const Key('markdown-code-block'),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 4, 8, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              width: 32,
-              height: 32,
-              child: IconButton(
-                tooltip: context.l10n.copyCode,
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                iconSize: 16,
-                onPressed: () => unawaited(_copyCode(context, text, copyText)),
-                icon: const Icon(Icons.copy_all_outlined),
-              ),
-            ),
-          ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SelectableText(text, style: style),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Future<void> _copyCode(
-  BuildContext context,
-  String text,
-  MarkdownTextCopier copyText,
-) async {
-  try {
-    await copyText(text);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(context.l10n.codeCopied)));
-  } catch (_) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(context.l10n.couldNotCopyCode)));
   }
 }
 

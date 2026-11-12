@@ -7,6 +7,9 @@ enum TaskOwnership { available, local, external }
 
 enum TaskItemKind { user, agent, command, file, tool, reasoning, notice }
 
+/// 从协议的结构化动作提取语义，视图无需猜测终端命令。
+enum TaskActivityKind { read, search, listFiles, plan, context }
+
 final class SubagentReference {
   const SubagentReference(this.threadId, {this.path, this.status});
 
@@ -66,6 +69,8 @@ final class TaskItem {
     this.changes = const [],
     this.startedAt,
     this.completedAt,
+    this.activityKind,
+    this.activityTarget,
   });
 
   final String id;
@@ -81,6 +86,8 @@ final class TaskItem {
   final TaskTurnInfo? turn;
   final String? phase;
   final List<TaskFileChange> changes;
+  final TaskActivityKind? activityKind;
+  final String? activityTarget;
 
   /// 服务端记录的消息生命周期时间；缺失时保持未知，不用刷新时间替代。
   final DateTime? startedAt;
@@ -115,6 +122,8 @@ final class TaskItem {
     turn: turn ?? this.turn,
     phase: phase ?? this.phase,
     changes: changes,
+    activityKind: activityKind,
+    activityTarget: activityTarget,
     startedAt: startedAt ?? this.startedAt,
     completedAt: completedAt ?? this.completedAt,
   );

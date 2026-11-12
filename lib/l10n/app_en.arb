@@ -805,5 +805,19 @@
   "goDeviceOnly": "Stored securely on this device",
   "goConnectionSecurity": "SSH encryption · Host fingerprint verification",
   "goNoWorkspacesMatch": "No matching workspaces",
-  "goNoWorkspacesMatchHint": "Try a workspace name or remote path."
+  "goNoWorkspacesMatchHint": "Try a workspace name or remote path.",
+  "chatOptions": "Conversation options",
+  "chatAwaitingYou": "Needs attention",
+  "chatRead": "Read",
+  "chatSearch": "Search",
+  "chatBrowse": "Browse",
+  "chatPlan": "Plan",
+  "chatContext": "Context",
+  "chatExecute": "Run",
+  "chatEdit": "Edit",
+  "chatEvent": "Event",
+  "chatCode": "Code",
+  "chatWrapCode": "Wrap lines",
+  "chatProcess": "Work log",
+  "chatSelectText": "Select text"
 }

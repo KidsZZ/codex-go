@@ -1,4 +1,8 @@
+import 'package:codex_go/domain/conversations/permission_mode.dart';
 import 'package:codex_go/features/conversation/conversation_welcome.dart';
+import 'package:codex_go/features/conversation/widgets/conversation_composer.dart';
+import 'package:codex_go/features/conversation/widgets/conversation_header.dart';
+import 'package:codex_go/features/conversation/widgets/process_disclosure.dart';
 
 // 基于 Android-SSH-Codex 的已验证实现改编；原作者版权与 MIT 许可见 LICENSE。
 import 'dart:async';
@@ -258,14 +262,6 @@ class _ConversationViewState extends State<ConversationView> {
             commandBusy: _commandBusy,
             onCommand: _handleCommand,
           ),
-          if (!widget.controller.isConnected && !widget.newConversation)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: Text(
-                context.l10n.offlineCached,
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
           Expanded(
             child: RemoteFileActions(
               download: widget.controller.downloadFile,
@@ -395,53 +391,6 @@ class _ConversationViewState extends State<ConversationView> {
                         ),
                       ),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Row(
-                      children: [
-                        PermissionPicker(
-                          value: draft.permissionMode,
-                          compact: true,
-                          enabled: !_sending,
-                          onChanged: (value) {
-                            draft.permissionMode = value;
-                            draft.changed();
-                          },
-                        ),
-                        Expanded(
-                          child: TurnSettingsPicker(
-                            accountUsage: widget.controller.accountUsage,
-                            models: widget.controller.models,
-                            value: resolveTurnSettings(
-                              widget.controller.models,
-                              _turnSettings,
-                              model: task.model,
-                              effort: task.reasoningEffort,
-                              useCatalogDefault: widget.newConversation,
-                            ),
-                            useCatalogDefault: widget.newConversation,
-                            inheritedServiceTier: task.serviceTier,
-                            enabled: !_sending,
-                            onChanged: (value) {
-                              if (draft.disposed) return;
-                              draft.settings = value;
-                              draft.changed();
-                            },
-                          ),
-                        ),
-                        SendModePicker(
-                          value: _sendMode,
-                          enabled: !_sending,
-                          onChanged: (mode) {
-                            setState(() => _sendMode = mode);
-                            _draft.changed();
-                          },
-                          compact: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
                   if (_attachments.isNotEmpty)
                     SizedBox(
                       height: 52,
@@ -459,7 +408,61 @@ class _ConversationViewState extends State<ConversationView> {
                     ),
                   if (_sending || _pickingAttachment)
                     const LinearProgressIndicator(minHeight: 2),
-                  _Composer(
+                  ConversationComposer(
+                    settings: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TurnSettingsPicker(
+                          compact: true,
+                          accountUsage: widget.controller.accountUsage,
+                          models: widget.controller.models,
+                          value: resolveTurnSettings(
+                            widget.controller.models,
+                            _turnSettings,
+                            model: task.model,
+                            effort: task.reasoningEffort,
+                            useCatalogDefault: widget.newConversation,
+                          ),
+                          useCatalogDefault: widget.newConversation,
+                          inheritedServiceTier: task.serviceTier,
+                          enabled: !_sending,
+                          onChanged: (value) {
+                            if (draft.disposed) return;
+                            draft.settings = value;
+                            draft.changed();
+                          },
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Wrap(
+                            spacing: 12,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              PermissionPicker(
+                                value: draft.permissionMode,
+                                enabled: !_sending,
+                                onChanged: (value) {
+                                  draft.permissionMode = value;
+                                  draft.changed();
+                                },
+                              ),
+                              SendModePicker(
+                                value: _sendMode,
+                                enabled: !_sending,
+                                onChanged: (mode) {
+                                  setState(() => _sendMode = mode);
+                                  _draft.changed();
+                                },
+                                compact: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    permissionWarning:
+                        draft.permissionMode == PermissionMode.fullAccess,
+                    hasAttachments: _attachments.isNotEmpty,
                     running: task.status == TaskStatus.running,
                     connected: widget.controller.isConnected,
                     onStop: () => _handleCommand(TaskCommand.interrupt),
@@ -478,9 +481,13 @@ class _ConversationViewState extends State<ConversationView> {
                         (file) => file.ready,
                       ),
                     ),
-                    completions: _completions,
-                    loadingCompletions: _loadingSkills,
-                    onCompletion: _selectCompletion,
+                    completions: _completions.isNotEmpty || _loadingSkills
+                        ? _CompletionPicker(
+                            completions: _completions,
+                            loading: _loadingSkills,
+                            onSelected: _selectCompletion,
+                          )
+                        : null,
                     onSend:
                         widget.newConversation && !widget.controller.isConnected
                         ? widget.onConnect
@@ -1871,7 +1878,10 @@ class _TaskTimelineState extends State<TaskTimeline>
     if (!_scrollController.hasClients) return;
     _checkOlderContext();
     final awayFromLatest = _distanceFromLatest > _followThreshold;
-    final showJump = awayFromLatest && !_followLatest;
+    final showJump =
+        awayFromLatest &&
+        !_followLatest &&
+        _distanceFromLatest > (_showJumpToLatest ? 24 : 120);
     if (showJump == _showJumpToLatest) return;
     _setScrollState(() => _showJumpToLatest = showJump);
   }
@@ -1913,6 +1923,7 @@ class _TaskTimelineState extends State<TaskTimeline>
       // Pause at gesture start, before a streaming update can animate us back.
       _automaticPagesSinceGesture = 0;
       _olderLoadArmed = true;
+      _anchorRevision++;
       _setScrollState(() => _followLatest = false);
       return false;
     }
@@ -1920,7 +1931,8 @@ class _TaskTimelineState extends State<TaskTimeline>
       final atLatest = _distanceFromLatest <= _followThreshold;
       _setScrollState(() {
         _followLatest = atLatest;
-        _showJumpToLatest = !atLatest;
+        _showJumpToLatest =
+            !atLatest && _distanceFromLatest > (_showJumpToLatest ? 24 : 120);
       });
       return false;
     }
@@ -1932,13 +1944,11 @@ class _TaskTimelineState extends State<TaskTimeline>
         notification.dragDetails != null;
     if (!userDriven && !userOverscroll) return false;
     _anchorRevision++;
-    const followLatest = false;
-    if (followLatest == _followLatest && _showJumpToLatest == !followLatest) {
-      return false;
-    }
+    final showJump = _distanceFromLatest > (_showJumpToLatest ? 24 : 120);
+    if (!_followLatest && _showJumpToLatest == showJump) return false;
     _setScrollState(() {
-      _followLatest = followLatest;
-      _showJumpToLatest = !followLatest;
+      _followLatest = false;
+      _showJumpToLatest = showJump;
     });
     return false;
   }
@@ -1964,7 +1974,7 @@ class _TaskTimelineState extends State<TaskTimeline>
     }
   }
 
-  void _preserveVisibleRow() {
+  void _preserveVisibleRow({bool animated = false}) {
     if (!_scrollController.hasClients) return;
     final viewport = context.findRenderObject();
     if (viewport is! RenderBox || !viewport.hasSize) return;
@@ -1986,8 +1996,10 @@ class _TaskTimelineState extends State<TaskTimeline>
     final revision = ++_anchorRevision;
     // 停止惯性动画，否则分页布局和惯性滚动会同时修改位置。
     _scrollController.jumpTo(_scrollController.offset);
+    Duration? started;
     void restore(int remaining) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((timestamp) {
+        started ??= timestamp;
         if (!mounted ||
             revision != _anchorRevision ||
             !_scrollController.hasClients ||
@@ -2006,7 +2018,12 @@ class _TaskTimelineState extends State<TaskTimeline>
             ),
           );
         }
-        if (remaining > 1) restore(remaining - 1);
+        if (animated
+            ? timestamp - started! < const Duration(milliseconds: 240)
+            : remaining > 1) {
+          restore(remaining - 1);
+          WidgetsBinding.instance.scheduleFrame();
+        }
       });
     }
 
@@ -2031,7 +2048,7 @@ class _TaskTimelineState extends State<TaskTimeline>
       _showJumpToLatest = false;
     });
     final latest = _scrollController.position.minScrollExtent;
-    if (animated) {
+    if (animated && _distanceFromLatest > _followThreshold) {
       _scrollController.animateTo(
         latest,
         duration: const Duration(milliseconds: 220),
@@ -2088,84 +2105,113 @@ class _TaskTimelineState extends State<TaskTimeline>
               return false;
             },
             child: SelectionArea(
-              child: ListView.builder(
-                controller: _scrollController,
-                reverse: true,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                itemCount: entries.length + 1,
-                findChildIndexCallback: (key) {
-                  final index = entries.indexWhere(
-                    (entry) => ValueKey(entry.key) == key,
-                  );
-                  return index < 0 ? null : entries.length - index - 1;
-                },
-                itemBuilder: (_, index) {
-                  if (index == entries.length) {
-                    return _OlderContextControl(
-                      loading: widget.loadingOlder || _requestingOlder,
-                      error: widget.olderError,
-                      hasOlder: widget.hasOlder,
-                      onRetry: () => _loadOlder(retry: true),
+              // 短对话从顶部开始；长对话仍使用反向惰性列表保持实时追加稳定。
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  controller: _scrollController,
+                  reverse: true,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                  itemCount: entries.length + 1,
+                  findChildIndexCallback: (key) {
+                    final index = entries.indexWhere(
+                      (entry) => ValueKey(entry.key) == key,
                     );
-                  }
-                  final entry = entries[entries.length - index - 1];
-                  return KeyedSubtree(
-                    key: ValueKey(entry.key),
-                    child: KeyedSubtree(
-                      key: _rowKeys.putIfAbsent(entry.key, GlobalKey.new),
-                      child: switch (entry) {
-                        TimelineMessageEntry(:final item) => GestureDetector(
-                          onLongPress:
-                              item.turnId != null && widget.onTurnAction != null
-                              ? () => widget.onTurnAction!(item)
-                              : null,
-                          child: TimelineItemView(
-                            item: item,
-                            loadImage: widget.loadImage,
-                            onTurnAction:
-                                item.turnId != null &&
-                                    widget.onTurnAction != null
-                                ? () => widget.onTurnAction!(item)
-                                : null,
-                            onAnswerQuestions:
-                                item.id == openQuestionItemId &&
-                                    widget.onAnswerQuestions != null
-                                ? (answers) =>
-                                      widget.onAnswerQuestions!(item, answers)
-                                : null,
-                          ),
+                    return index < 0 ? null : entries.length - index - 1;
+                  },
+                  itemBuilder: (_, index) {
+                    if (index == entries.length) {
+                      return _OlderContextControl(
+                        loading: widget.loadingOlder || _requestingOlder,
+                        error: widget.olderError,
+                        hasOlder: widget.hasOlder,
+                        onRetry: () => _loadOlder(retry: true),
+                      );
+                    }
+                    final entryIndex = entries.length - index - 1;
+                    final entry = entries[entryIndex];
+                    final previous = entryIndex > 0
+                        ? entries[entryIndex - 1]
+                        : null;
+                    final gap = switch (entry) {
+                      TimelineMessageEntry(:final item)
+                          when item.kind == TaskItemKind.user =>
+                        previous == null ? 8.0 : 24.0,
+                      TimelineMessageEntry() =>
+                        previous is TimelineMessageEntry &&
+                                previous.item.kind == TaskItemKind.user
+                            ? 20.0
+                            : 12.0,
+                      _ => previous is TimelineMessageEntry ? 10.0 : 0.0,
+                    };
+                    return KeyedSubtree(
+                      key: ValueKey(entry.key),
+                      child: KeyedSubtree(
+                        key: _rowKeys.putIfAbsent(entry.key, GlobalKey.new),
+                        child: Padding(
+                          padding: EdgeInsets.only(top: gap),
+                          child: switch (entry) {
+                            TimelineMessageEntry(
+                              :final item,
+                              :final showActions,
+                            ) =>
+                              TimelineItemView(
+                                item: item,
+                                showActions: showActions,
+                                streaming:
+                                    item.kind == TaskItemKind.agent &&
+                                    item.completedAt == null &&
+                                    item.turn?.status == 'inProgress' &&
+                                    widget.items.last.id == item.id,
+                                loadImage: widget.loadImage,
+                                onTurnAction:
+                                    item.turnId != null &&
+                                        widget.onTurnAction != null
+                                    ? () => widget.onTurnAction!(item)
+                                    : null,
+                                onAnswerQuestions:
+                                    item.id == openQuestionItemId &&
+                                        widget.onAnswerQuestions != null
+                                    ? (answers) => widget.onAnswerQuestions!(
+                                        item,
+                                        answers,
+                                      )
+                                    : null,
+                              ),
+                            TimelineProcessEntry(:final items, :final turn) =>
+                              TurnProcess(
+                                items: items,
+                                turn: turn,
+                                expanded: _expandedProcesses.contains(
+                                  entry.key,
+                                ),
+                                onExpanded: (expanded) {
+                                  _setScrollState(() {
+                                    if (expanded) {
+                                      _expandedProcesses.add(entry.key);
+                                    } else {
+                                      _expandedProcesses.remove(entry.key);
+                                    }
+                                  });
+                                },
+                                loadImage: widget.loadImage,
+                              ),
+                            TimelineChangesEntry(:final items) => TurnChanges(
+                              items: items,
+                            ),
+                            TimelineActivityEntry(:final items) =>
+                              TimelineActivityGroup(
+                                items: items,
+                                loadImage: widget.loadImage,
+                                onOpenSubagent: widget.onOpenSubagent,
+                              ),
+                          },
                         ),
-                        TimelineProcessEntry(:final items, :final turn) =>
-                          TurnProcess(
-                            items: items,
-                            turn: turn,
-                            expanded: _expandedProcesses.contains(entry.key),
-                            onExpanded: (expanded) {
-                              _followLatest = false;
-                              _preserveVisibleRow();
-                              _setScrollState(() {
-                                if (expanded) {
-                                  _expandedProcesses.add(entry.key);
-                                } else {
-                                  _expandedProcesses.remove(entry.key);
-                                }
-                              });
-                            },
-                            loadImage: widget.loadImage,
-                          ),
-                        TimelineChangesEntry(:final items) => TurnChanges(
-                          items: items,
-                        ),
-                        TimelineActivityEntry(:final items) =>
-                          TimelineActivityGroup(
-                            items: items,
-                            loadImage: widget.loadImage,
-                            onOpenSubagent: widget.onOpenSubagent,
-                          ),
-                      },
-                    ),
-                  );
-                },
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -2209,7 +2255,18 @@ class _TaskTimelineState extends State<TaskTimeline>
               ),
             ),
           ),
-        Expanded(child: timeline),
+        Expanded(
+          child: NotificationListener<ConversationLayoutChange>(
+            onNotification: (change) {
+              if (change.userInitiated) _followLatest = false;
+              if (!_followLatest) {
+                _preserveVisibleRow(animated: change.userInitiated);
+              }
+              return true;
+            },
+            child: timeline,
+          ),
+        ),
       ],
     );
   }
@@ -2247,7 +2304,7 @@ class _OlderContextControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 44,
+    height: 32,
     child: Center(
       child: loading
           ? const SizedBox.square(
@@ -2265,7 +2322,11 @@ class _OlderContextControl extends StatelessWidget {
           : !hasOlder
           ? Text(
               context.l10n.startOfTask,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant
+                    .withValues(alpha: .55),
+              ),
             )
           : TextButton(
               key: const Key('load-older-context'),
@@ -2289,219 +2350,32 @@ class _TaskHeader extends StatelessWidget {
   });
   final CodexRuntime controller;
   final TaskRecord task;
-  final bool commandBusy;
-  final bool newConversation;
+  final bool commandBusy, newConversation, showBackButton;
   final ValueChanged<TaskCommand> onCommand;
-  final VoidCallback? onOpenNavigation;
-  final bool showBackButton;
-  final VoidCallback? onNewConversation;
+  final VoidCallback? onOpenNavigation, onNewConversation;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-    child: Row(
-      children: [
-        if (showBackButton)
-          IconButton(
-            tooltip: context.l10n.goBackToList,
-            onPressed: onOpenNavigation ?? controller.clearSelectedTask,
-            icon: const Icon(Icons.arrow_back_rounded),
-          ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                newConversation ? context.l10n.newChat : task.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (task.cwd.isNotEmpty)
-                Text(
-                  task.cwd,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-            ],
-          ),
-        ),
-        if (onNewConversation != null)
-          IconButton(
-            tooltip: context.l10n.newChat,
-            onPressed: onNewConversation,
-            icon: const Icon(Icons.edit_square, size: 21),
-          ),
-        if (!newConversation)
-          TaskCommandMenu(
+  Widget build(BuildContext context) => ConversationHeader(
+    task: task,
+    connected: controller.isConnected,
+    waiting:
+        controller.approvals.any((r) => r.threadId == task.id) ||
+        controller.userInputRequests.any((r) => r.threadId == task.id),
+    title: newConversation ? context.l10n.newChat : task.title,
+    details: [
+      controller.selectedHost?.label,
+      task.cwd,
+      if (!controller.isConnected) context.l10n.offlineCached,
+    ].whereType<String>().where((s) => s.isNotEmpty).join('\n\n'),
+    onBack: showBackButton
+        ? onOpenNavigation ?? controller.clearSelectedTask
+        : null,
+    onNew: onNewConversation,
+    trailing: newConversation
+        ? null
+        : TaskCommandMenu(
             enabled: controller.isConnected && !commandBusy,
             onSelected: onCommand,
           ),
-      ],
-    ),
-  );
-}
-
-class _Composer extends StatelessWidget {
-  const _Composer({
-    required this.controller,
-    required this.focusNode,
-    required this.inputEnabled,
-    required this.sendEnabled,
-    required this.completions,
-    required this.loadingCompletions,
-    required this.onCompletion,
-    required this.onSend,
-    required this.sendMode,
-    required this.running,
-    required this.connected,
-    required this.onStop,
-    required this.onSendOptions,
-    this.onAttach,
-  });
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final bool inputEnabled, sendEnabled, loadingCompletions, running, connected;
-  final List<ComposerCompletion> completions;
-  final ValueChanged<ComposerCompletion> onCompletion;
-  final VoidCallback onSend, onStop, onSendOptions;
-  final TaskSendMode sendMode;
-  final ValueChanged<bool>? onAttach;
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (completions.isNotEmpty || loadingCompletions)
-            _CompletionPicker(
-              completions: completions,
-              loading: loadingCompletions,
-              onSelected: onCompletion,
-            ),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerLowest,
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).colorScheme.primary
-                      .withValues(alpha: .04),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-              borderRadius: BorderRadius.circular(22),
-            ),
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-            child: Column(
-              children: [
-                TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  enabled: inputEnabled,
-                  minLines: 1,
-                  maxLines:
-                      MediaQuery.sizeOf(context).height -
-                              MediaQuery.viewInsetsOf(context).bottom <
-                          420
-                      ? 2
-                      : 5,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    hintText: context.l10n.messagePlaceholder,
-                    // 对话输入面板已有容器边界，不继承配置表单的输入框描边。
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    disabledBorder: InputBorder.none,
-                    filled: false,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    if (Attachments.supported)
-                      PopupMenuButton<bool>(
-                        tooltip: context.l10n.addAttachment,
-                        enabled: onAttach != null,
-                        onSelected: onAttach,
-                        icon: const Icon(Icons.add, size: 22),
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: true,
-                            child: Text(context.l10n.image),
-                          ),
-                          PopupMenuItem(
-                            value: false,
-                            child: Text(context.l10n.fileOrVideo),
-                          ),
-                        ],
-                      ),
-                    Expanded(
-                      child: Text(
-                        running
-                            ? context.l10n.runningComposerHint
-                            : connected
-                            ? context.l10n.remoteComposerHint
-                            : context.l10n.localDraftHint,
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                    ),
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: controller,
-                      builder: (context, value, _) {
-                        final stop = running && value.text.trim().isEmpty;
-                        return GestureDetector(
-                          onLongPress: !stop && sendEnabled
-                              ? onSendOptions
-                              : null,
-                          child: IconButton.filled(
-                            tooltip: stop
-                                ? context.l10n.stopGenerating
-                                : switch (sendMode) {
-                                    TaskSendMode.auto =>
-                                      context.l10n.sendMessage,
-                                    TaskSendMode.steer =>
-                                      context.l10n.steerTurnAction,
-                                    TaskSendMode.queue =>
-                                      context.l10n.queueMessage,
-                                  },
-                            onPressed: stop
-                                ? (connected ? onStop : null)
-                                : sendEnabled
-                                ? onSend
-                                : null,
-                            icon: Icon(
-                              stop
-                                  ? Icons.stop_rounded
-                                  : sendMode == TaskSendMode.queue
-                                  ? Icons.schedule
-                                  : Icons.arrow_upward,
-                              size: 22,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
   );
 }
 

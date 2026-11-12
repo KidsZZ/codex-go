@@ -1,6 +1,11 @@
 // 基于 Android-SSH-Codex 的已验证实现改编；原作者版权与 MIT 许可见 LICENSE。
 import 'dart:async';
 
+import 'activity_presentation.dart';
+import 'process_disclosure.dart';
+import 'code_block.dart';
+import 'streaming_reply.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
@@ -27,9 +32,12 @@ class TimelineItemView extends StatelessWidget {
     this.loadImage,
     this.onAnswerQuestions,
     this.onTurnAction,
+    this.showActions = true,
+    this.streaming = false,
     super.key,
   });
 
+  final bool showActions, streaming;
   final TaskItem item;
   final MessageTextCopier copyText;
   final Future<Uint8List> Function(String)? loadImage;
@@ -47,11 +55,13 @@ class TimelineItemView extends StatelessWidget {
           loadImage: loadImage,
           onAnswerQuestions: onAnswerQuestions,
           onTurnAction: onTurnAction,
+          showActions: showActions,
+          streaming: streaming,
         ),
         _ => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ActivityCard(item: item),
+            ActivityRow(item: item),
             for (final attachment in item.attachments)
               _AttachmentCard(
                 attachment: attachment,
@@ -72,14 +82,11 @@ class TimelineActivityGroup extends StatelessWidget {
     this.onOpenSubagent,
     super.key,
   });
-
   final List<TaskItem> items;
   final Future<Uint8List> Function(String)? loadImage;
   final ValueChanged<SubagentReference>? onOpenSubagent;
-
   @override
   Widget build(BuildContext context) {
-    final count = items.length;
     final targets = <String, SubagentReference>{};
     for (final item in items) {
       for (final agent in item.subagents) {
@@ -91,49 +98,43 @@ class TimelineActivityGroup extends StatelessWidget {
         );
       }
     }
+    final failed = items.any(activityFailed);
     return ImagePreviewScope(
       loadImage: loadImage,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Card(
-              key: const Key('activity-group'),
-              margin: EdgeInsets.zero,
-              clipBehavior: Clip.antiAlias,
-              child: ExpansionTile(
-                initiallyExpanded: items.any(
-                  (item) =>
-                      item.status == 'failed' ||
-                      item.turn?.status == 'interrupted',
+          // 少量动作直接显示，连续过程才分组。错误不藏在默认收起的组里。
+          if (items.length < 3 || failed)
+            for (final item in items)
+              ActivityRow(key: ValueKey(item.id), item: item)
+          else
+            ProcessDisclosure(
+              key: PageStorageKey('actions:${items.first.id}'),
+              icon: Icons.pending_actions_rounded,
+              label: context.l10n.workEvents(items.length),
+              detail: activitySummary(context, items),
+              trailing:
+                  items.any(
+                    (item) => const {
+                      'inProgress',
+                      'running',
+                      'in_progress',
+                    }.contains(item.status),
+                  )
+                  ? const SizedBox.square(
+                      dimension: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    )
+                  : null,
+              child: ProcessDetailViewport(
+                itemCount: items.length,
+                itemBuilder: (_, index) => ActivityRow(
+                  key: ValueKey(items[index].id),
+                  item: items[index],
                 ),
-                dense: true,
-                visualDensity: const VisualDensity(vertical: -3),
-                leading: const Icon(Icons.build_circle_outlined, size: 19),
-                title: Text(context.l10n.workEvents(count)),
-                subtitle: Text(
-                  items
-                      .map(
-                        (item) => item.title ?? _activityLabel(context, item),
-                      )
-                      .join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                children: [
-                  _ActivityViewport(
-                    itemCount: items.length,
-                    itemBuilder: (context, index) => _CompactActivityRow(
-                      key: PageStorageKey('activity-${items[index].id}'),
-                      item: items[index],
-                    ),
-                  ),
-                ],
               ),
             ),
-          ),
           if (targets.isNotEmpty)
             _SubagentLinks(
               agents: targets.values.toList(growable: false),
@@ -150,6 +151,20 @@ class TimelineActivityGroup extends StatelessWidget {
       ),
     );
   }
+}
+
+String _subagentLabel(BuildContext context, SubagentReference agent) {
+  final status = switch (agent.status) {
+    'pendingInit' => context.l10n.starting,
+    'running' => context.l10n.running,
+    'completed' => context.l10n.completed,
+    'interrupted' => context.l10n.interrupted,
+    'errored' => context.l10n.failed,
+    'shutdown' => context.l10n.closed,
+    'notFound' => context.l10n.unavailable,
+    final status => status,
+  };
+  return status == null ? agent.label : '${agent.label} · $status';
 }
 
 class _SubagentLinks extends StatelessWidget {
@@ -180,7 +195,7 @@ class _SubagentLinks extends StatelessWidget {
           ? Column(
               children: [for (final agent in agents) _tile(context, agent)],
             )
-          : _ActivityViewport(
+          : ProcessDetailViewport(
               viewportKey: const Key('subagent-viewport'),
               maxHeight: 176,
               itemCount: agents.length,
@@ -190,125 +205,6 @@ class _SubagentLinks extends StatelessWidget {
   }
 }
 
-/// Keep the collapse header outside the scrollable details, including when a
-/// single tool output is much taller than the screen.
-class _ActivityViewport extends StatefulWidget {
-  const _ActivityViewport({
-    required this.itemCount,
-    required this.itemBuilder,
-    this.viewportKey = const Key('activity-viewport'),
-    this.maxHeight = 360,
-  });
-
-  final int itemCount;
-  final IndexedWidgetBuilder itemBuilder;
-  final Key viewportKey;
-  final double maxHeight;
-
-  @override
-  State<_ActivityViewport> createState() => _ActivityViewportState();
-}
-
-class _ActivityViewportState extends State<_ActivityViewport> {
-  final _scroll = ScrollController();
-
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final available =
-        media.size.height - media.viewInsets.bottom - media.padding.vertical;
-    final height = (available * 0.4).clamp(80, widget.maxHeight).toDouble();
-    return ConstrainedBox(
-      key: widget.viewportKey,
-      constraints: BoxConstraints(maxHeight: height),
-      child: NotificationListener<ScrollNotification>(
-        // Internal scrolling must not change the chat's follow-latest state.
-        onNotification: (_) => true,
-        child: Scrollbar(
-          controller: _scroll,
-          thumbVisibility: true,
-          child: ListView.builder(
-            controller: _scroll,
-            primary: false,
-            shrinkWrap: true,
-            padding: const EdgeInsets.only(right: 8),
-            itemCount: widget.itemCount,
-            itemBuilder: widget.itemBuilder,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CompactActivityRow extends StatelessWidget {
-  const _CompactActivityRow({required this.item, super.key});
-
-  final TaskItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final detail = item.detail?.trim();
-    final subtitle = item.text.trim();
-    return ExpansionTile(
-      dense: true,
-      visualDensity: const VisualDensity(vertical: -4),
-      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-      childrenPadding: const EdgeInsets.fromLTRB(38, 0, 8, 8),
-      leading: Icon(
-        _activityIcon(item),
-        size: 17,
-        color: _activityColor(context, item),
-      ),
-      title: Text(
-        item.title ?? _activityLabel(context, item),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: subtitle.isEmpty
-          ? null
-          : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-      trailing: item.status == null ? null : _StatusBadge(status: item.status!),
-      showTrailingIcon: detail?.isNotEmpty == true,
-      children: [
-        if (detail?.isNotEmpty == true)
-          Align(
-            // SelectableText/Markdown have internal scrollables. Their
-            // saved offsets must not overwrite ExpansionTile's bool state.
-            key: PageStorageKey('activity-detail-${item.id}'),
-            alignment: Alignment.centerLeft,
-            child: item.kind == TaskItemKind.reasoning
-                ? MarkdownContent(text: detail!)
-                : SelectableText(
-                    detail!,
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
-          ),
-      ],
-    );
-  }
-}
-
-String _subagentLabel(BuildContext context, SubagentReference agent) {
-  final status = switch (agent.status) {
-    'pendingInit' => context.l10n.starting,
-    'running' => context.l10n.running,
-    'completed' => context.l10n.completed,
-    'interrupted' => context.l10n.interrupted,
-    'errored' => context.l10n.failed,
-    'shutdown' => context.l10n.closed,
-    'notFound' => context.l10n.unavailable,
-    final status => status,
-  };
-  return status == null ? agent.label : '${agent.label} · $status';
-}
-
 class _Message extends StatelessWidget {
   const _Message({
     required this.item,
@@ -316,48 +212,142 @@ class _Message extends StatelessWidget {
     this.loadImage,
     this.onAnswerQuestions,
     this.onTurnAction,
+    this.showActions = true,
+    this.streaming = false,
   });
-
   final TaskItem item;
   final MessageTextCopier copyText;
   final Future<Uint8List> Function(String)? loadImage;
   final TaskQuestionSubmitter? onAnswerQuestions;
   final VoidCallback? onTurnAction;
+  final bool showActions, streaming;
+
+  void _menu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_copyableMessageText(item).isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.copy_all_outlined),
+                title: Text(context.l10n.copyMessage),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  unawaited(
+                    _copyMessage(context, _copyableMessageText(item), copyText),
+                  );
+                },
+              ),
+            if (_copyableMessageText(item).isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.text_fields_rounded),
+                title: Text(context.l10n.chatSelectText),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  showDialog<void>(
+                    context: context,
+                    builder: (dialog) => AlertDialog(
+                      title: Text(context.l10n.chatSelectText),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        child: SingleChildScrollView(
+                          child: SelectableText(_copyableMessageText(item)),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialog),
+                          child: Text(context.l10n.close),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            if (onTurnAction != null)
+              ListTile(
+                leading: const Icon(Icons.more_horiz),
+                title: Text(context.l10n.turnActions),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  onTurnAction!();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = item.kind == TaskItemKind.user;
     final colors = Theme.of(context).colorScheme;
-    final copyableText = _copyableMessageText(item);
     final sending = user && item.status == 'sending';
-    final messageTime = item.messageTime;
+    final time = item.messageTime;
     final locale = Localizations.localeOf(context).toLanguageTag();
     final content = parseAttachmentMessage(item.text, item.attachments);
     final agentText = questionMessageBody(item.text, item.questions);
-    return Align(
-      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 720),
-        margin: EdgeInsets.only(top: user ? 20 : 8, bottom: user ? 16 : 24),
-        padding: EdgeInsets.symmetric(
-          horizontal: user ? 18 : 0,
-          vertical: user ? 12 : 0,
-        ),
-        decoration: BoxDecoration(
-          color: user ? colors.primaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: user
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
-          children: [
-            if (user)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+    final timestamp = time == null
+        ? null
+        : Tooltip(
+            message: formatFullLocalTime(time, locale),
+            child: Text(
+              formatLocalTime(time, locale),
+              style: TextStyle(
+                fontSize: 10.5,
+                height: 1.4,
+                color: colors.onSurfaceVariant.withValues(alpha: .7),
+              ),
+            ),
+          );
+    final footer = Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      alignment: user ? WrapAlignment.end : WrapAlignment.start,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (timestamp != null) timestamp,
+        if (sending)
+          const SizedBox.square(
+            key: Key('pending-user-progress'),
+            dimension: 12,
+            child: CircularProgressIndicator(strokeWidth: 1.5),
+          ),
+        if (!user && showActions) ...[
+          if (_copyableMessageText(item).isNotEmpty)
+            _MessageAction(
+              tooltip: context.l10n.copyMessage,
+              icon: Icons.copy_all_outlined,
+              onPressed: () => unawaited(
+                _copyMessage(context, _copyableMessageText(item), copyText),
+              ),
+            ),
+          if (onTurnAction != null)
+            _MessageAction(
+              tooltip: context.l10n.turnActions,
+              icon: Icons.more_horiz,
+              onPressed: onTurnAction!,
+            ),
+        ],
+      ],
+    );
+    if (user) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+          return Align(
+            alignment: Alignment.centerRight,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: constraints.maxWidth * (scale > 1.3 ? .92 : .84),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  // 附件拥有自己的预览和下载操作，不挤进文字气泡。
                   for (final attachment in content.attachments)
                     _AttachmentCard(
                       attachment: attachment,
@@ -365,102 +355,106 @@ class _Message extends StatelessWidget {
                       loadImage: loadImage,
                     ),
                   if (content.text.trim().isNotEmpty)
-                    MarkdownContent(text: content.text, copyText: copyText),
-                ],
-              )
-            else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final attachment in item.attachments)
-                    _AttachmentCard(
-                      attachment: attachment,
-                      copyText: copyText,
-                      loadImage: loadImage,
-                    ),
-                  if (agentText.trim().isNotEmpty)
-                    CodexDirectiveContent(text: agentText, copyText: copyText),
-                  if (item.questions.isNotEmpty)
-                    TaskQuestionPanel(
-                      key: ValueKey('questions-${item.id}'),
-                      questions: item.questions,
-                      onSubmit: onAnswerQuestions,
-                    ),
-                ],
-              ),
-            if (messageTime != null ||
-                sending ||
-                copyableText.isNotEmpty ||
-                onTurnAction != null) ...[
-              const SizedBox(height: 4),
-              // 大字号下操作区自动换行，保留完整时间和复制入口。
-              Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                alignment: user ? WrapAlignment.end : WrapAlignment.start,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (messageTime != null)
-                    Tooltip(
-                      message: formatFullLocalTime(messageTime, locale),
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Text(
-                          formatLocalTime(messageTime, locale),
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: user
-                                    ? colors.onPrimaryContainer.withValues(
-                                        alpha: .7,
-                                      )
-                                    : colors.onSurfaceVariant,
-                              ),
+                    Semantics(
+                      onLongPress: () => _menu(context),
+                      child: GestureDetector(
+                        onLongPress: () => _menu(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 11,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Color.alphaBlend(
+                              colors.primary.withValues(alpha: .055),
+                              colors.surfaceContainerLow,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: SelectionContainer.disabled(
+                            child: MarkdownContent(
+                              text: content.text,
+                              selectable: false,
+                              copyText: copyText,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  if (sending)
-                    const SizedBox(
-                      key: Key('pending-user-progress'),
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                  if (time != null || sending)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 5, right: 4),
+                      child: footer,
                     ),
-                  if (copyableText.isNotEmpty)
-                    SizedBox(
-                      width: 28,
-                      height: 24,
-                      child: IconButton(
-                        tooltip: context.l10n.copyMessage,
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                        iconSize: 16,
-                        onPressed: () => unawaited(
-                          _copyMessage(context, copyableText, copyText),
-                        ),
-                        icon: const Icon(Icons.copy_all_outlined),
-                      ),
-                    ),
-                  if (onTurnAction != null)
-                    SizedBox(
-                      width: 28,
-                      height: 24,
-                      child: IconButton(
-                        tooltip: context.l10n.turnActions,
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                        iconSize: 16,
-                        onPressed: onTurnAction,
-                        icon: const Icon(Icons.more_horiz),
-                      ),
+                  // 纯附件消息也提供回合操作入口。
+                  if (content.text.trim().isEmpty && onTurnAction != null)
+                    _MessageAction(
+                      tooltip: context.l10n.turnActions,
+                      icon: Icons.more_horiz,
+                      onPressed: onTurnAction!,
                     ),
                 ],
               ),
-            ],
-          ],
-        ),
-      ),
+            ),
+          );
+        },
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final attachment in item.attachments)
+          _AttachmentCard(
+            attachment: attachment,
+            copyText: copyText,
+            loadImage: loadImage,
+          ),
+        if (agentText.trim().isNotEmpty)
+          StreamingReply(
+            key: ValueKey('reply:${item.id}'),
+            text: agentText,
+            streaming: streaming,
+            builder: (text) =>
+                CodexDirectiveContent(text: text, copyText: copyText),
+          ),
+        if (item.questions.isNotEmpty)
+          TaskQuestionPanel(
+            key: ValueKey('questions-${item.id}'),
+            questions: item.questions,
+            onSubmit: onAnswerQuestions,
+          ),
+        if (time != null || showActions)
+          Padding(padding: const EdgeInsets.only(top: 5), child: footer),
+      ],
     );
   }
+}
+
+class _MessageAction extends StatelessWidget {
+  const _MessageAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    style: IconButton.styleFrom(
+      minimumSize: const Size.square(32),
+      padding: const EdgeInsets.all(6),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+    icon: Icon(
+      icon,
+      size: 16,
+      color: Theme.of(context).colorScheme.onSurfaceVariant
+          .withValues(alpha: .7),
+    ),
+  );
 }
 
 class _AttachmentCard extends StatelessWidget {
@@ -619,115 +613,80 @@ Future<void> _copyMessage(
   }
 }
 
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard({required this.item});
-
+/// 每个动作只占一行；展开后能选择、复制完整命令和输出。
+class ActivityRow extends StatelessWidget {
+  const ActivityRow({required this.item, super.key});
   final TaskItem item;
-
   @override
   Widget build(BuildContext context) {
-    final expandable =
-        item.kind == TaskItemKind.reasoning ||
-        item.detail?.trim().isNotEmpty == true;
-    final detail = item.detail?.trim();
-    final body =
-        item.kind == TaskItemKind.reasoning && detail?.isNotEmpty == true
-        ? '${item.text.trim()}\n\n$detail'
-        : detail?.isNotEmpty == true
-        ? detail!
-        : item.text.trim();
-    final tile = ExpansionTile(
-      leading: Icon(
-        _activityIcon(item),
-        size: 20,
-        color: _activityColor(context, item),
-      ),
-      title: Row(
+    final failed = activityFailed(item);
+    final running = const {
+      'inProgress',
+      'running',
+      'in_progress',
+    }.contains(item.status);
+    final time = item.messageTime;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final pieces = <String>[
+      if (item.title?.trim().isNotEmpty == true) item.title!,
+      if (item.text.trim().isNotEmpty && item.text != item.title) item.text,
+      if (item.detail?.trim().isNotEmpty == true && item.detail != item.text)
+        item.detail!,
+    ];
+    final body = pieces.join('\n\n');
+    return ProcessDisclosure(
+      key: PageStorageKey('action:${item.id}'),
+      icon: activityIcon(item),
+      label: activityLabel(context, item),
+      detail: activityDetail(item),
+      color: activityColor(context, item),
+      initiallyExpanded: failed,
+      trailing: failed
+          ? Tooltip(
+              message: context.l10n.activityStatus(item.status!),
+              child: Icon(
+                Icons.error_outline,
+                size: 16,
+                color: Theme.of(context).colorScheme.error,
+              ),
+            )
+          : running
+          ? const SizedBox.square(
+              dimension: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5),
+            )
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Text(
-              item.title ?? _activityLabel(context, item),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          if (time != null || item.status != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                [
+                  if (time != null) formatFullLocalTime(time, locale),
+                  if (item.status != null)
+                    context.l10n.activityStatus(item.status!),
+                ].join(' · '),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
-          ),
-          if (item.status != null) _StatusBadge(status: item.status!),
+          if (body.isNotEmpty)
+            ProcessDetailViewport(
+              itemCount: 1,
+              itemBuilder: (_, index) =>
+                  item.kind == TaskItemKind.reasoning ||
+                      item.activityKind == TaskActivityKind.plan
+                  ? MarkdownContent(text: body)
+                  : ConversationCodeBlock(
+                      code: body,
+                      language: item.kind == TaskItemKind.file ? 'diff' : null,
+                    ),
+            ),
         ],
-      ),
-      subtitle: item.kind == TaskItemKind.reasoning || item.text == body
-          ? null
-          : Text(item.text, maxLines: 2, overflow: TextOverflow.ellipsis),
-      initiallyExpanded: !expandable,
-      showTrailingIcon: expandable,
-      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-      children: [
-        _ActivityViewport(
-          itemCount: 1,
-          itemBuilder: (context, index) => Align(
-            alignment: Alignment.centerLeft,
-            child: item.kind == TaskItemKind.reasoning
-                ? MarkdownContent(text: body)
-                : SelectableText(
-                    body,
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
-          ),
-        ),
-      ],
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Card(
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        child: tile,
-      ),
-    );
-  }
-}
-
-IconData _activityIcon(TaskItem item) => switch (item.kind) {
-  TaskItemKind.command => Icons.terminal,
-  TaskItemKind.file => Icons.difference_outlined,
-  TaskItemKind.tool => Icons.build_outlined,
-  TaskItemKind.reasoning => Icons.psychology_outlined,
-  _ => Icons.info_outline,
-};
-
-String _activityLabel(BuildContext context, TaskItem item) =>
-    switch (item.kind) {
-      TaskItemKind.command => context.l10n.command,
-      TaskItemKind.file => context.l10n.fileChanges,
-      TaskItemKind.tool => context.l10n.tool,
-      TaskItemKind.reasoning => context.l10n.reasoning,
-      _ => context.l10n.activity,
-    };
-
-Color _activityColor(BuildContext context, TaskItem item) =>
-    switch (item.kind) {
-      TaskItemKind.command => Theme.of(context).colorScheme.secondary,
-      TaskItemKind.file => Theme.of(context).colorScheme.primary,
-      TaskItemKind.tool => Theme.of(context).colorScheme.tertiary,
-      _ => Theme.of(context).colorScheme.outline,
-    };
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Text(
-        context.l10n.activityStatus(status).toLowerCase(),
-        style: Theme.of(context).textTheme.labelSmall,
       ),
     );
   }
