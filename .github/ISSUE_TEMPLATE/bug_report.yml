@@ -1,0 +1,37 @@
+name: Bug report / 问题反馈
+description: Report a reproducible problem / 报告可复现的问题
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        支持中英文。请勿上传密码、私钥、访问令牌、真实主机信息或未脱敏的对话。安全漏洞请先阅读 SECURITY.md。
+        English reports are welcome. Remove credentials and private data before sharing logs or screenshots.
+  - type: input
+    id: environment
+    attributes:
+      label: App and device / 应用与设备
+      description: App version, Android version, and device model. / 应用版本、Android 版本、设备型号。
+      placeholder: Codex Go 0.1.0, Android 16, Pixel 9
+    validations:
+      required: true
+  - type: input
+    id: remote
+    attributes:
+      label: Remote environment / 远端环境
+      description: Codex version, operating system, and service mode; omit host addresses. / Codex 版本、远端系统和服务模式，不填写真实地址。
+      placeholder: codex-cli 0.167.1, Linux, shared / 共享服务
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps and behavior / 复现步骤与表现
+      description: Explain how to reproduce it, what you expected, and what happened. / 描述操作步骤、预期结果和实际表现。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence / 脱敏后的日志或截图
+      description: Include the failing connection stage if relevant. Never paste private keys or unreviewed diagnostics. / 连接问题请说明失败阶段，提交诊断前先检查内容。

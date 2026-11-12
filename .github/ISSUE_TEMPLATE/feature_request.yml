@@ -1,0 +1,23 @@
+name: Feature request / 功能建议
+description: Describe a workflow you want to improve / 描述希望改进的使用场景
+title: "[Feature] "
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Use case / 使用场景
+      description: What are you trying to do, and what makes it difficult today? / 你想完成什么，现在遇到了什么困难？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Expected experience / 期望体验
+      description: Describe the behavior you want. Screenshots or sketches are welcome. / 描述你希望的操作方式，可附示意图。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / 其他方案
+      description: Optional workarounds or tradeoffs. / 可选，补充现有替代方法或取舍。

@@ -5,9 +5,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// 仅发布入口主动打开签名开关；配置文件存在不应改变预览包的签名身份。
+val releaseSigning = providers.environmentVariable("CODEX_GO_RELEASE_SIGNING").orNull == "true"
 val signing = Properties()
-val signingFile = rootProject.file("key.properties")
-if (signingFile.exists()) signingFile.inputStream().use { signing.load(it) }
+if (releaseSigning) {
+    val signingFile = rootProject.file("key.properties")
+    require(signingFile.isFile) { "正式发布缺少 android/key.properties" }
+    signingFile.inputStream().use { signing.load(it) }
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword").forEach { key ->
+        require(!signing.getProperty(key).isNullOrBlank()) { "正式发布签名配置缺少字段：$key" }
+    }
+    require(rootProject.file(signing.getProperty("storeFile")).isFile) { "正式发布签名密钥文件不存在" }
+}
 
 android {
     namespace = "dev.codexgo.app"
@@ -25,17 +34,16 @@ android {
         versionName = flutter.versionName
     }
     signingConfigs {
-        if (signingFile.exists()) create("release") {
+        if (releaseSigning) create("release") {
             keyAlias = signing.getProperty("keyAlias")
             keyPassword = signing.getProperty("keyPassword")
-            storeFile = file(signing.getProperty("storeFile"))
+            storeFile = rootProject.file(signing.getProperty("storeFile"))
             storePassword = signing.getProperty("storePassword")
         }
     }
     buildTypes {
         release {
-            // 本地预览允许调试签名；公开发布通过构建脚本要求正式签名。
-            signingConfig = signingConfigs.getByName(if (signingFile.exists()) "release" else "debug")
+            signingConfig = signingConfigs.getByName(if (releaseSigning) "release" else "debug")
         }
     }
 }

@@ -1,19 +1,33 @@
+# Flutter 与构建产物
 .dart_tool/
 .flutter-plugins*
 .packages
 build/
 coverage/
 lib/l10n/generated/
-android/.gradle/
+*.apk
+*.aab
+
+# 本机工具链、编辑器与诊断
+.toolchain/
+.fvm/
+.codex/
+.idea/
+*.iml
+*.log
+*.hprof
+.DS_Store
+
+# 环境、凭据与签名材料
+.env
+.env.*
 android/local.properties
 android/key.properties
 *.jks
 *.keystore
 *.p12
+*.pfx
 *.pem
 *.key
-.env
-.env.*
-.idea/
-*.iml
-*.log
+id_rsa
+id_ed25519

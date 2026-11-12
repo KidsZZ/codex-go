@@ -1,73 +1,121 @@
 # Codex Go
 
-以工作区和对话为中心的远程 Codex Android 客户端。通过 SSH 连接你的开发环境，在手机上继续已有会话、查看执行进度、回答问题和确认权限。代码与任务执行留在远端电脑上。
+[English](README.en.md) · [参与开发](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [MIT License](LICENSE)
 
-本项目处于 `0.1.0` 预览阶段，独立维护，非 OpenAI 官方应用。当前支持 Android；其他平台尚未验证。
+在 Android 手机上连接自己的开发电脑，继续 Codex 对话、查看代码改动、处理权限确认。通过 SSH 使用远端 Codex 的原生 app-server 协议，代码、工具和任务执行留在你的电脑上。
 
-## 使用方式
+**当前为 0.1.0 预览版。** 本项目独立维护，非 OpenAI 官方应用，也未获 OpenAI 背书。目前面向 Android ARM64 手机；远端已在 Linux 环境验证，其他平台尚未验证。
 
-1. 在「连接」中添加 SSH 主机。支持密码、私钥、独立跳板机凭据与 SSH 配置导入。
-2. 首次连接时核对并确认主机指纹。共享服务模式默认复用远端 Codex 服务；也可以选择独立服务或指定 Unix socket。
-3. 在「工作区」中选择目录，或者在「对话」中浏览这台主机的近期会话。工作区会结合共享项目和完整会话历史自动发现，按最近活动排序。
-4. 打开已有对话，或新建对话后发送第一条消息。运行过程中可以停止、插话、排队发送和处理中断后的下一条消息。
-5. 在「设置」中切换简体中文 / English，以及系统 / 明亮 / 深色外观。主机凭据保存在系统安全存储中。
+<p>
+  <img src="docs/images/conversations.png" alt="按最近活动组织的会话首页" width="280">
+  <img src="docs/images/conversation-dark.png" alt="深色主题下的对话、执行过程和代码块" width="280">
+</p>
 
-远端需要可用的 SSH 服务及支持 app-server 协议的 Codex。首次使用前，应在远端完成 Codex 安装与登录。客户端不会内置账号、API 密钥或远端主机地址。
+截图来自真实界面的示例数据，不含个人主机或真实对话。
 
-## 已包含的能力
+## 它能做什么
 
-- 工作区发现、最近活动排序、精确目录归属与共享项目管理。
-- 会话搜索、分页、置顶、归档和恢复；运行中与待处理筛选。
-- 流式对话、Markdown 与代码块，按回合组织的执行过程、文件改动与 diff。
-- 模型、推理强度、权限范围、技能、MCP、目标与上下文操作。
-- 草稿与发送队列持久化、断线重连、后台连接保持和主机指纹校验。
-- 附件上传、图片 / 视频预览、文件下载和 SSH 端口转发。
-- 手机单栏导航，宽屏会话列表与正文并排显示。
+- **接着工作**：浏览、搜索和继续已有会话，置顶、归档与恢复会话。
+- **按项目组织**：结合共享项目和完整会话历史发现工作区，按最近活动排序。
+- **读懂执行过程**：流式回复、分钟级消息时间、可展开的动作记录、文件改动与 diff；代码支持高亮、复制和换行。
+- **控制下一步**：选择模型、推理强度与权限；停止生成、插话、排队发送，回答 Codex 提问和权限请求。
+- **传递上下文**：上传附件，预览图片和视频，下载远端文件，通过 SSH 转发端口查看开发服务。
+- **适应手机使用**：保存草稿与发送队列，支持重连和后台连接保持，提供简体中文 / English、明亮 / 深色外观。
 
-## 开发与构建
+## 开始使用
 
-已验证的工具链为 Flutter `3.47.7`、Dart `3.13.5`、JDK 17。Android SDK 按 Flutter 的标准方式配置，环境中需要能找到 `flutter`。
+### 1. 准备远端电脑
 
-```sh
-flutter pub get
-flutter analyze --no-pub
-bash tool/build_android.sh
-```
+- 手机能够通过 SSH 访问这台电脑，且你拥有对应账号与凭据。
+- 按 [Codex CLI 官方文档](https://developers.openai.com/codex/cli)安装 Codex，并先在远端终端完成登录。
+- 当前开发环境使用 **Codex CLI 0.167.1**。这是验证基线，不代表最低兼容版本。
 
-APK 输出至 `build/artifacts/`。默认构建用于本地预览，未提供正式签名时使用 Android 调试签名。
-
-公开发布前，需要在 `android/key.properties` 中配置自己的 `storeFile`、`storePassword`、`keyAlias` 和 `keyPassword`，然后运行：
+本客户端依赖 app-server 的 Unix socket 和 `proxy` 子命令；默认共享模式还需要 `daemon start`，或已经运行的共享服务。可以在远端先检查：
 
 ```sh
-bash tool/build_android.sh --signed
+codex --version
+codex app-server --help
+codex app-server proxy --help
+codex app-server daemon --help
 ```
 
-签名配置、签名文件和 `.env` 均被 Git 忽略，不应提交。项目不包含某台电脑的 SDK、依赖缓存或代理路径；可以通过 `PUB_CACHE`、`GRADLE_USER_HOME` 等标准环境变量复用已有工具链缓存。
+若缺少对应子命令或 `unix://` 监听方式，请先升级到具有这些能力的 Codex 版本。官方协议说明见 [Codex app-server](https://developers.openai.com/codex/app-server)。协议仍在演进，暂不承诺兼容所有新旧版本。
 
-Android application ID 为 `dev.codexgo.app`，与 Android-SSH-Codex 独立安装、独立存储，不自动迁移旧应用的主机凭据。
+### 2. 安装 Android 客户端
 
-## 代码结构
+正式发布的安装包放在仓库的 **Releases** 页面，选择 `arm64-v8a-release.apk`。支持 Android 7.0（API 24）及以上。
+
+GitHub Actions 产物中的 `preview.apk` 用于开发验收，使用调试签名；它与正式发布密钥签名的安装包不能相互覆盖更新。需要自行构建时，见下方说明。
+
+### 3. 添加连接并开始对话
+
+1. 打开「连接」，填写 SSH 地址、端口和用户名，选择密码或私钥认证。需要时可配置跳板机，或导入 SSH 配置。
+2. 首次连接时核对主机指纹，再确认连接。
+3. 服务模式保持默认的「共享服务」即可，通常**不需要填写 socket 路径**。
+4. 在「工作区」选择目录，或从「对话」打开已有任务；新建对话后发送第一条消息。
+
+| 服务模式 | 适用情况 | 是否需要填写 socket |
+| --- | --- | --- |
+| 共享服务（默认） | 启动或复用远端 Codex 管理的共享服务 | 不需要，自动获取 |
+| 独立服务 | 为 Codex Go 启动单独的 app-server 进程 | 不需要，自动管理 |
+| 指定 socket | 连接你自己管理的现有 app-server | 需要填写远端绝对路径 |
+
+三种模式均通过 SSH 访问远端，不需要把 app-server 端口暴露到公网。独立服务指单独的服务进程；它仍使用同一远端用户的 Codex 账号和数据目录，不等同于账号或工作区隔离。
+
+## 从源码构建
+
+工具链版本固定在 [tool/flutter-sdk.json](tool/flutter-sdk.json)：Flutter **3.47.7**（包含 Dart 3.13.5）、JDK **17**。安装 Android SDK、接受 SDK 许可，并确保 `flutter doctor -v` 中 Android 工具链可用。脚本需要 Bash；Windows 开发者可使用合适的 Bash 环境。
+
+进入源码目录后执行：
+
+```sh
+flutter pub get --enforce-lockfile
+bash tool/check.sh
+bash tool/build_android.sh --no-pub
+```
+
+默认生成优化过的开发预览包和校验文件：
 
 ```text
-lib/
-  app/              应用入口、生命周期和设计系统
-  domain/           会话、工作区、草稿与消息状态模型
-  infrastructure/   SSH、Codex RPC、安全存储和平台能力
-  runtime/          连接、目录、发送队列、会话操作等职责模块
-  features/         工作区导航、对话、主机配置与设置
-  shared/           通用视觉组件与媒体能力
-  l10n/             中英文 ARB 与本地化入口
-android/            独立 Android 工程及原生能力
+build/artifacts/codex-go-0.1.0-arm64-v8a-preview.apk
+build/artifacts/codex-go-0.1.0-arm64-v8a-preview.apk.sha256
 ```
 
-导航状态不由服务器事件驱动。运行时模块共享连接代次，异步请求在切换主机后不得写入新连接状态；远端搜索另有请求代次，避免旧查询覆盖新结果。语言与外观通过独立通知更新，不让每条流式消息重新构建整个应用主题。
+`--debug` 生成调试构建；`--signed` 生成正式签名构建。依赖锁文件提交到仓库；工具链和依赖缓存不提交，可通过标准 `PUB_CACHE`、`GRADLE_USER_HOME` 环境变量复用。
 
-本地化由 Flutter 根据 ARB 生成，生成目录不提交；修改文案后运行 `flutter gen-l10n`。
+应用 ID 为 `dev.codexgo.app`。它与 Android-SSH-Codex 独立安装、独立存储，不自动迁移旧应用凭据。
+
+## 常见问题与限制
+
+- **SSH 已连上，但服务或隧道失败**：先核对远端 Codex 登录状态及上述子命令；客户端会尝试解析非交互 SSH 环境的 PATH。自定义安装可在主机配置中补充环境变量。查看错误阶段时，要区分 SSH、远端服务启动和 socket 代理。
+- **没有出现预期工作区**：工作区来自共享项目记录和会话工作目录；它不是扫描磁盘上的每个文件夹。没有任何记录的目录需要手动新建工作区或会话。
+- **历史消息没有时间**：只显示服务端实际记录的时间，不用刷新时间补造历史时间。
+- **后台连接被系统终止**：Android 的省电策略可能限制后台服务；客户端提供重连，但无法保证任意设备上永不断线。
+- **平台支持**：当前发布目标为 Android ARM64；iOS、桌面客户端、其他 CPU 架构与其他远端系统不在已验证范围内。
+
+## 参与开发
+
+请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。Bug 和功能建议可使用仓库的 Issue 模板；涉及凭据或安全漏洞时，请先阅读 [SECURITY.md](SECURITY.md)。
+
+```text
+lib/app/             应用入口、生命周期与主题
+lib/domain/          会话、工作区、草稿与状态模型
+lib/infrastructure/  SSH、Codex RPC、安全存储与平台接口
+lib/runtime/         连接、目录、消息队列与会话操作
+lib/features/        对话、工作区、连接与设置界面
+lib/shared/          通用组件、格式化与媒体能力
+lib/l10n/            中英文文案
+android/             Android 原生能力
+```
 
 ## 来源与许可
 
-本项目采用 MIT 许可，完整条款见 [LICENSE](LICENSE)。
+本项目采用 [MIT License](LICENSE)。
 
-SSH 传输、Codex 协议、会话归并、附件与部分对话呈现，以及 Android 后台连接和预览能力，基于 [Android-SSH-Codex](https://github.com/wkj2333666/Android-SSH-Codex) 改编。参考基线为 `41f1f144e2049da78d471199aa3516bc4f333e59`（v0.4.45 发布准备），同时吸收了本地开发版本中已验证的功能修复和对话交互改进。保留原作者版权声明；新项目的独立维护不代表这些实现从零编写。
+SSH 传输、Codex 协议、会话归并、附件和部分对话呈现，以及 Android 后台连接与预览能力，基于 [Android-SSH-Codex](https://github.com/wkj2333666/Android-SSH-Codex) 改编。参考基线为 `41f1f144e2049da78d471199aa3516bc4f333e59`，并吸收了本地版本已验证的修复；原作者版权与许可保留在 [LICENSE](LICENSE) 和 [资源许可](assets/licenses/android-ssh-codex.txt) 中。
 
-Codex Go 重新组织了运行时职责、应用导航、工作区入口、连接管理、视觉系统与构建工程。对话组织方式也参考了 dsh-Go 的产品实践；本项目没有依赖 dsh-Go 的运行时服务或构建目录。
+Codex Go 独立组织应用导航、运行时职责、工作区、连接管理、对话体验和构建工程。对话交互参考了 dsh-Go 的产品实践，项目运行与构建不依赖 dsh-Go 的目录或服务。
+
+代码字体使用 JetBrains Mono，遵循 [SIL OFL 1.1](assets/licenses/jetbrains-mono.txt)；语法高亮使用 re_highlight。其他依赖的许可可在应用的开源许可页面查看。
+
+Gradle Wrapper 来自 Gradle 官方发行版本，遵循 Apache License 2.0；完整许可保留在 `android/gradle/wrapper/gradle-wrapper.jar` 的 `META-INF/LICENSE` 中。

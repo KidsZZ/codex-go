@@ -1,14 +1,11 @@
-gradle-wrapper.jar
-/.gradle
-/captures/
-/gradlew
-/gradlew.bat
-/local.properties
-GeneratedPluginRegistrant.java
+# Wrapper 本身应随源码发布，缓存和本机配置保持私有。
+.gradle/
+.kotlin/
 .cxx/
-
-# Remember to never publicly share your keystore.
-# See https://flutter.dev/to/reference-keystore
+.externalNativeBuild/
+captures/
+local.properties
 key.properties
-**/*.keystore
-**/*.jks
+GeneratedPluginRegistrant.java
+*.keystore
+*.jks
