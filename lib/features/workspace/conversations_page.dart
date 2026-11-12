@@ -198,12 +198,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
       builder: (context, viewport) {
         // Scaffold 已扣除键盘高度，使用实际内容约束判断紧凑布局。
         final compact = viewport.maxHeight < 520;
-        final showResume =
-            hasHost &&
-            !widget.sidebar &&
-            !searching &&
-            !compact &&
-            MediaQuery.textScalerOf(context).scale(1) < 1.35;
 
         return Column(
           children: [
@@ -217,24 +211,45 @@ class _ConversationsPageState extends State<ConversationsPage> {
                 ),
                 child: Row(
                   children: [
-                    const GoMark(size: 36),
-                    const SizedBox(width: 12),
+                    // 品牌与连接入口共用顶部空间，保留完整触控区域。
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Codex Go',
-                            style: Theme.of(context).textTheme.titleLarge,
+                      child: InkWell(
+                        onTap: widget.onHosts,
+                        borderRadius: BorderRadius.circular(12),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: Row(
+                            children: [
+                              const GoMark(size: 36),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Codex Go',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleLarge,
+                                    ),
+                                    if (hasHost)
+                                      _HostSummary(runtime: c)
+                                    else
+                                      Text(
+                                        l.navConversations,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            l.navConversations,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                     if (hasHost)
@@ -257,11 +272,6 @@ class _ConversationsPageState extends State<ConversationsPage> {
                       ),
                   ],
                 ),
-              ),
-            if (showResume)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 18),
-                child: _ResumeCard(runtime: c, onHosts: widget.onHosts),
               ),
             if (hasHost && !compact)
               Padding(
@@ -515,79 +525,50 @@ class _ConversationsPageState extends State<ConversationsPage> {
   }
 }
 
-class _ResumeCard extends StatelessWidget {
-  const _ResumeCard({required this.runtime, required this.onHosts});
+/// 长主机名优先省略，连接状态始终可见；触控由整个品牌区域承载。
+class _HostSummary extends StatelessWidget {
+  const _HostSummary({required this.runtime});
   final CodexRuntime runtime;
-  final VoidCallback onHosts;
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [colors.primaryContainer, colors.surfaceContainerLowest],
-        ),
-        border: Border.all(color: colors.primary.withValues(alpha: .1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final connecting =
+        runtime.connectionPhase == RemoteConnectionPhase.connecting ||
+        runtime.connectionPhase == RemoteConnectionPhase.reconnecting;
+    final status = runtime.isConnected
+        ? context.l10n.connected
+        : connecting
+        ? context.l10n.connecting
+        : context.l10n.offline;
+    return DefaultTextStyle.merge(
+      style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+      child: Row(
         children: [
-          Text(
-            context.l10n.goResume,
-            style: Theme.of(context).textTheme.titleLarge,
+          Icon(
+            Icons.circle,
+            size: 7,
+            color: runtime.isConnected
+                ? colors.secondary
+                : connecting
+                ? colors.primary
+                : colors.outline,
           ),
-          const SizedBox(height: 6),
-          Text(
-            context.l10n.goRecentHint,
-            style: TextStyle(color: colors.onSurfaceVariant),
-          ),
-          const SizedBox(height: 14),
-          InkWell(
-            onTap: onHosts,
-            borderRadius: BorderRadius.circular(12),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.circle,
-                  size: 8,
-                  color: runtime.isConnected
-                      ? colors.secondary
-                      : colors.outline,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    runtime.selectedHost?.label ?? context.l10n.connectHost,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                Text(
-                  runtime.isConnected
-                      ? context.l10n.connected
-                      : runtime.connectionPhase ==
-                                RemoteConnectionPhase.connecting ||
-                            runtime.connectionPhase ==
-                                RemoteConnectionPhase.reconnecting
-                      ? context.l10n.connecting
-                      : context.l10n.offline,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right, size: 18),
-              ],
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              runtime.selectedHost?.label ?? context.l10n.connectHost,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+          ),
+          const SizedBox(width: 8),
+          Text(status),
+          const SizedBox(width: 2),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 14,
+            color: colors.onSurfaceVariant,
           ),
         ],
       ),
@@ -620,6 +601,17 @@ class _ConversationRow extends StatelessWidget {
         .lastOrNull
         ?.text
         .replaceAll(RegExp(r'\s+'), ' ');
+    // 使用设备本地时区精确到分钟；当天省略日期，跨年保留年份。
+    final updatedAt = task.updatedAt.toLocal();
+    final now = DateTime.now();
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final timeLabel = DateUtils.isSameDay(updatedAt, now)
+        ? DateFormat.Hm(locale).format(updatedAt)
+        : (updatedAt.year == now.year
+                  ? DateFormat.Md(locale)
+                  : DateFormat.yMd(locale))
+              .add_Hm()
+              .format(updatedAt);
     final tone = attention
         ? colors.tertiary
         : running
@@ -725,13 +717,16 @@ class _ConversationRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      DateFormat.Md(
-                        Localizations.localeOf(context).toLanguageTag(),
-                      ).format(task.updatedAt.toLocal()),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colors.onSurfaceVariant,
+                    Tooltip(
+                      message: DateFormat.yMd(locale)
+                          .add_Hm()
+                          .format(updatedAt),
+                      child: Text(
+                        timeLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],

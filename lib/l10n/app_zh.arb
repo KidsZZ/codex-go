@@ -447,8 +447,6 @@
   "goWelcomeTitle": "从你的开发环境开始",
   "goWelcomeBody": "添加一台 SSH 主机，继续已有的工作区和对话。代码与执行始终留在你的电脑上。",
   "goAddFirstHost": "添加第一台主机",
-  "goResume": "继续你的工作",
-  "goRecentHint": "想法、进展与执行结果，都在这里。",
   "goNewConversation": "开始新对话",
   "goNoConversations": "还没有对话",
   "goNoConversationsHint": "选一个工作区，或者直接开始一段对话。",

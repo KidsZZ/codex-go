@@ -737,8 +737,6 @@
   "goWelcomeTitle": "Start with your workspace",
   "goWelcomeBody": "Add an SSH host to continue your workspaces and conversations. Code and execution stay on your computer.",
   "goAddFirstHost": "Add your first host",
-  "goResume": "Pick up where you left off",
-  "goRecentHint": "Ideas, progress and results, together.",
   "goNewConversation": "Start a conversation",
   "goNoConversations": "A fresh start",
   "goNoConversationsHint": "Choose a workspace or start a conversation.",
