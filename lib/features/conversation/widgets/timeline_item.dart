@@ -640,7 +640,6 @@ class ActivityRow extends StatelessWidget {
       label: activityLabel(context, item),
       detail: activityDetail(item),
       color: activityColor(context, item),
-      initiallyExpanded: failed,
       trailing: failed
           ? Tooltip(
               message: context.l10n.activityStatus(item.status!),

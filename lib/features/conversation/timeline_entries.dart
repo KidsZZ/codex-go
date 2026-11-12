@@ -25,7 +25,7 @@ final class TimelineActivityEntry extends TimelineEntry {
 final class TimelineProcessEntry extends TimelineEntry {
   const TimelineProcessEntry(this.items, this.turn);
   final List<TaskItem> items;
-  final TaskTurnInfo turn;
+  final TaskTurnInfo? turn;
   @override
   String get key => 'process:${items.first.id}';
 }
@@ -40,22 +40,13 @@ final class TimelineChangesEntry extends TimelineEntry {
 List<TimelineEntry> buildTimelineEntries(List<TaskItem> items) {
   final result = <TimelineEntry>[];
   final lastAnswers = <String, String>{};
-  final lastMessages = <String, String>{};
   for (final item in items) {
-    if (item.kind == TaskItemKind.agent &&
-        item.turnId != null &&
-        item.text.trim().isNotEmpty) {
-      lastMessages[item.turnId!] = item.id;
-    }
     if (item.kind == TaskItemKind.agent &&
         item.turnId != null &&
         item.phase != 'commentary' &&
         item.text.trim().isNotEmpty) {
       lastAnswers[item.turnId!] = item.id;
     }
-  }
-  for (final entry in lastMessages.entries) {
-    lastAnswers.putIfAbsent(entry.key, () => entry.value);
   }
   var segment = <TaskItem>[];
   void flush() {
@@ -66,32 +57,36 @@ List<TimelineEntry> buildTimelineEntries(List<TaskItem> items) {
         .firstOrNull;
     final process = <TaskItem>[];
     final exposed = <TaskItem>[];
+    // 历史回合可能缺少状态；过程归类不能依赖已完成标记。
+    // commentary 永远是过程，不能因没有 final_answer 被提升成正文。
+    for (final item in segment) {
+      final isAnswer =
+          item.kind == TaskItemKind.agent &&
+          (item.phase == 'final_answer' ||
+              (item.phase != 'commentary' &&
+                  (item.turnId == null ||
+                      lastAnswers[item.turnId] == item.id)));
+      if (const {
+            'failed',
+            'declined',
+            'denied',
+            'errored',
+            'interrupted',
+          }.contains(item.status) ||
+          isAnswer ||
+          item.attachments.isNotEmpty ||
+          item.questions.isNotEmpty ||
+          item.subagents.isNotEmpty ||
+          item.kind == TaskItemKind.notice) {
+        exposed.add(item);
+      } else {
+        process.add(item);
+      }
+    }
+    if (process.isNotEmpty) {
+      result.add(TimelineProcessEntry(List.unmodifiable(process), turn));
+    }
     if (turn?.completed == true) {
-      for (final item in segment) {
-        final isAnswer =
-            item.kind == TaskItemKind.agent &&
-            (item.phase == 'final_answer' ||
-                lastAnswers[item.turnId] == item.id);
-        if (const {
-              'failed',
-              'declined',
-              'denied',
-              'errored',
-              'interrupted',
-            }.contains(item.status) ||
-            isAnswer ||
-            item.attachments.isNotEmpty ||
-            item.questions.isNotEmpty ||
-            item.subagents.isNotEmpty ||
-            item.kind == TaskItemKind.notice) {
-          exposed.add(item);
-        } else {
-          process.add(item);
-        }
-      }
-      if (process.isNotEmpty) {
-        result.add(TimelineProcessEntry(List.unmodifiable(process), turn!));
-      }
       final changed = segment
           .where(
             (item) =>
@@ -103,8 +98,6 @@ List<TimelineEntry> buildTimelineEntries(List<TaskItem> items) {
       if (changed.isNotEmpty) {
         result.add(TimelineChangesEntry(List.unmodifiable(changed)));
       }
-    } else {
-      exposed.addAll(segment);
     }
     var activities = <TaskItem>[];
     void flushActivities() {

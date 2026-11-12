@@ -15,8 +15,7 @@ class ProcessDisclosure extends StatefulWidget {
     this.detail,
     this.color,
     this.trailing,
-    this.initiallyExpanded = false,
-    this.onChanged,
+    this.livePreview,
     super.key,
   });
   final IconData icon;
@@ -25,14 +24,16 @@ class ProcessDisclosure extends StatefulWidget {
   final Color? color;
   final Widget child;
   final Widget? trailing;
-  final bool initiallyExpanded;
-  final ValueChanged<bool>? onChanged;
+
+  /// 运行中的单行预览独立于展开状态，不能因此打开完整详情。
+  final String? livePreview;
   @override
   State<ProcessDisclosure> createState() => _ProcessDisclosureState();
 }
 
 class _ProcessDisclosureState extends State<ProcessDisclosure> {
-  late bool _open = widget.initiallyExpanded;
+  // 只有点击可以产生展开状态；服务端状态和内容更新不能替用户打开详情。
+  bool _open = false;
   bool _restored = false;
   @override
   void didChangeDependencies() {
@@ -45,19 +46,11 @@ class _ProcessDisclosureState extends State<ProcessDisclosure> {
     }
   }
 
-  @override
-  void didUpdateWidget(covariant ProcessDisclosure oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 新出现的错误自动展开一次，用户之后仍能主动收起。
-    if (!oldWidget.initiallyExpanded && widget.initiallyExpanded) _open = true;
-  }
-
   void _toggle() {
     ConversationLayoutChange().dispatch(context);
     setState(() => _open = !_open);
     PageStorage.maybeOf(context)
         ?.writeState(context, _open, identifier: 'disclosure:${widget.key}');
-    widget.onChanged?.call(_open);
   }
 
   @override
@@ -145,6 +138,16 @@ class _ProcessDisclosureState extends State<ProcessDisclosure> {
             ),
           ),
         ),
+        if (widget.livePreview case final preview?
+            when !_open && preview.trim().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 32, bottom: 8),
+            child: InkWell(
+              onTap: _toggle,
+              borderRadius: BorderRadius.circular(4),
+              child: _LiveProcessPreview(text: preview),
+            ),
+          ),
         AnimatedSize(
           duration: duration,
           curve: Curves.easeOutCubic,
@@ -169,6 +172,44 @@ class _ProcessDisclosureState extends State<ProcessDisclosure> {
               : const SizedBox(width: double.infinity),
         ),
       ],
+    );
+  }
+}
+
+/// 固定一行，跟随最新文字的末尾；更新只改变内容，不推动整个对话上下跳动。
+class _LiveProcessPreview extends StatelessWidget {
+  const _LiveProcessPreview({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      fontSize: 12,
+      height: 1.5,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+    // 限制排版长度并按字素截取，长思考不会累积渲染开销，也不截断组合 emoji。
+    final shown = text.characters
+        .takeLast(256)
+        .toString()
+        .replaceAll('**', '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return SizedBox(
+      height: MediaQuery.textScalerOf(context).scale(12) * 1.5,
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          reverse: true,
+          primary: false,
+          physics: const NeverScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            // 短文字从左侧开始；超过可用宽度后，仅展示最新的一行尾部。
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: Text(shown, maxLines: 1, softWrap: false, style: style),
+          ),
+        ),
+      ),
     );
   }
 }

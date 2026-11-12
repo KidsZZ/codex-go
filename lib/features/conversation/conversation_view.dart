@@ -1816,7 +1816,8 @@ class _TaskTimelineState extends State<TaskTimeline>
   // A long run of collapsed tool events may never fill the viewport.
   var _automaticPagesSinceGesture = 0;
   final Map<String, GlobalKey> _rowKeys = {};
-  final Set<String> _expandedProcesses = {};
+  // 仅在本次打开的对话内保留手动展开状态，滚动重建不丢失，退出后不恢复。
+  final _disclosureStorage = PageStorageBucket();
   int _anchorRevision = 0;
 
   @override
@@ -2183,18 +2184,6 @@ class _TaskTimelineState extends State<TaskTimeline>
                               TurnProcess(
                                 items: items,
                                 turn: turn,
-                                expanded: _expandedProcesses.contains(
-                                  entry.key,
-                                ),
-                                onExpanded: (expanded) {
-                                  _setScrollState(() {
-                                    if (expanded) {
-                                      _expandedProcesses.add(entry.key);
-                                    } else {
-                                      _expandedProcesses.remove(entry.key);
-                                    }
-                                  });
-                                },
                                 loadImage: widget.loadImage,
                               ),
                             TimelineChangesEntry(:final items) => TurnChanges(
@@ -2264,7 +2253,7 @@ class _TaskTimelineState extends State<TaskTimeline>
               }
               return true;
             },
-            child: timeline,
+            child: PageStorage(bucket: _disclosureStorage, child: timeline),
           ),
         ),
       ],

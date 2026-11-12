@@ -8,34 +8,38 @@ import 'code_block.dart';
 import 'process_disclosure.dart';
 import 'timeline_item.dart';
 
-/// 正常结束后收纳过程，摘要仍可读出做过的工作，正文与错误保留在时间线上。
+/// 所有状态的过程都默认收起，正文与错误提示保留在时间线上。
 class TurnProcess extends StatelessWidget {
   const TurnProcess({
     required this.items,
     required this.turn,
     this.loadImage,
-    this.expanded = false,
-    this.onExpanded,
     super.key,
   });
   final List<TaskItem> items;
-  final TaskTurnInfo turn;
-  final bool expanded;
-  final ValueChanged<bool>? onExpanded;
+  final TaskTurnInfo? turn;
   final Future<Uint8List> Function(String)? loadImage;
   @override
   Widget build(BuildContext context) {
-    final duration = turn.durationMs;
+    final duration = turn?.completed == true ? turn?.durationMs : null;
+    final running = turn?.status == 'inProgress';
     final summary = activitySummary(context, items);
     return ProcessDisclosure(
       key: PageStorageKey('process:${items.first.id}'),
-      icon: Icons.check_rounded,
+      livePreview: running ? _livePreview(context) : null,
+      icon: turn?.completed == true
+          ? Icons.check_rounded
+          : Icons.pending_actions_rounded,
+      trailing: running
+          ? const SizedBox.square(
+              dimension: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5),
+            )
+          : null,
       label: duration == null
           ? context.l10n.chatProcess
           : '${context.l10n.completed}${context.l10n.durationSeconds((duration / 1000).round())}',
       detail: summary.isEmpty ? context.l10n.viewExecutionProcess : summary,
-      initiallyExpanded: expanded,
-      onChanged: onExpanded,
       child: ProcessDetailViewport(
         itemCount: items.length,
         itemBuilder: (_, index) => Padding(
@@ -51,6 +55,19 @@ class TurnProcess extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String? _livePreview(BuildContext context) {
+    // 展示最新的思考、进度说明或动作摘要，不把整段终端日志塞进预览。
+    for (final item in items.reversed) {
+      final prose =
+          item.kind == TaskItemKind.agent ||
+          item.kind == TaskItemKind.reasoning;
+      final text = prose ? item.text : activityDetail(item);
+      if (text.trim().isEmpty) continue;
+      return prose ? text : '${activityLabel(context, item)} · $text';
+    }
+    return null;
   }
 }
 
