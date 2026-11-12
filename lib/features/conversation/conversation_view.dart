@@ -286,9 +286,6 @@ class _ConversationViewState extends State<ConversationView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (task.status == TaskStatus.running ||
-                      task.status == TaskStatus.queued)
-                    _activityStrip(context),
                   if (widget.controller.userInputRequests.any(
                     (r) => r.threadId == task.id,
                   ))
@@ -525,68 +522,6 @@ class _ConversationViewState extends State<ConversationView> {
       _draft.changed();
     },
   );
-
-  Widget _activityStrip(BuildContext context) {
-    final task = widget.task;
-    final activities = task.items
-        .where(
-          (i) => i.kind != TaskItemKind.user && i.kind != TaskItemKind.agent,
-        )
-        .toList();
-    final current = activities.lastOrNull;
-    return InkWell(
-      onTap: () => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (context) => SafeArea(
-          child: SizedBox(
-            height: MediaQuery.sizeOf(context).height * .8,
-            child: Column(
-              children: [
-                ListTile(
-                  title: Text(context.l10n.executionProcess),
-                  subtitle: Text(context.l10n.executionProcessDescription),
-                ),
-                Expanded(
-                  child: TaskTimeline(
-                    items: task.items,
-                    loadImage: widget.controller.loadAttachmentImage,
-                    onOpenSubagent: (agent) {
-                      final host = widget.controller.selectedHostId;
-                      if (host != null) {
-                        _openSubagent(context, widget.controller, host, agent);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        child: Row(
-          children: [
-            const SizedBox.square(
-              dimension: 12,
-              child: CircularProgressIndicator(strokeWidth: 1.5),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                current?.title ?? context.l10n.codexWorking,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-            const Icon(Icons.expand_less, size: 17),
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _chooseSendAction() async {
     final action = await showModalBottomSheet<String>(

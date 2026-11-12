@@ -1043,7 +1043,8 @@ TaskItem? _parseItem(Map<String, dynamic> item) {
       );
     }
   }
-  if ((kind == TaskItemKind.user || kind == TaskItemKind.agent) &&
+  // agentMessage 的 started 通知可能尚无正文，但携带后续流式消息的时间。
+  if (kind == TaskItemKind.user &&
       text.trim().isEmpty &&
       attachments.isEmpty &&
       questions.isEmpty) {
@@ -1061,6 +1062,8 @@ TaskItem? _parseItem(Map<String, dynamic> item) {
     detail: presentation.detail,
     status: item['status']?.toString(),
     phase: item['phase'] as String?,
+    startedAt: _parseItemTime(item['startedAtMs']),
+    completedAt: _parseItemTime(item['completedAtMs']),
     changes: List.unmodifiable([
       for (final raw in item['changes'] as List? ?? const [])
         TaskFileChange(
@@ -1289,6 +1292,12 @@ TaskStatus _parseStatus(Object? raw) {
     'interrupted' || 'cancelled' || 'canceled' => TaskStatus.interrupted,
     _ => TaskStatus.unknown,
   };
+}
+
+/// ThreadItem 明确使用 Unix 毫秒，不能沿用线程级秒时间戳的推断规则。
+DateTime? _parseItemTime(Object? raw) {
+  if (raw is! num || !raw.isFinite || raw.abs() > 8640000000000000) return null;
+  return DateTime.fromMillisecondsSinceEpoch(raw.toInt(), isUtc: true);
 }
 
 DateTime _parseTime(Object? raw) {

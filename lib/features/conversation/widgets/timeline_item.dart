@@ -14,6 +14,7 @@ import 'package:codex_go/features/conversation/widgets/task_question_panel.dart'
 import 'package:codex_go/features/conversation/widgets/task_question_content.dart';
 import 'package:codex_go/shared/media/preview_browser.dart';
 import 'package:codex_go/l10n/strings.dart';
+import 'package:codex_go/shared/formatting/local_time.dart';
 
 typedef MessageTextCopier = Future<void> Function(String text);
 
@@ -329,6 +330,8 @@ class _Message extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final copyableText = _copyableMessageText(item);
     final sending = user && item.status == 'sending';
+    final messageTime = item.messageTime;
+    final locale = Localizations.localeOf(context).toLanguageTag();
     final content = parseAttachmentMessage(item.text, item.attachments);
     final agentText = questionMessageBody(item.text, item.questions);
     return Align(
@@ -385,11 +388,36 @@ class _Message extends StatelessWidget {
                     ),
                 ],
               ),
-            if (sending || copyableText.isNotEmpty || onTurnAction != null) ...[
+            if (messageTime != null ||
+                sending ||
+                copyableText.isNotEmpty ||
+                onTurnAction != null) ...[
               const SizedBox(height: 4),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              // 大字号下操作区自动换行，保留完整时间和复制入口。
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                alignment: user ? WrapAlignment.end : WrapAlignment.start,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  if (messageTime != null)
+                    Tooltip(
+                      message: formatFullLocalTime(messageTime, locale),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Text(
+                          formatLocalTime(messageTime, locale),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: user
+                                    ? colors.onPrimaryContainer.withValues(
+                                        alpha: .7,
+                                      )
+                                    : colors.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                    ),
                   if (sending)
                     const SizedBox(
                       key: Key('pending-user-progress'),
@@ -397,8 +425,6 @@ class _Message extends StatelessWidget {
                       height: 12,
                       child: CircularProgressIndicator(strokeWidth: 1.5),
                     ),
-                  if (sending && copyableText.isNotEmpty)
-                    const SizedBox(width: 8),
                   if (copyableText.isNotEmpty)
                     SizedBox(
                       width: 28,

@@ -64,6 +64,8 @@ final class TaskItem {
     this.turn,
     this.phase,
     this.changes = const [],
+    this.startedAt,
+    this.completedAt,
   });
 
   final String id;
@@ -80,6 +82,14 @@ final class TaskItem {
   final String? phase;
   final List<TaskFileChange> changes;
 
+  /// 服务端记录的消息生命周期时间；缺失时保持未知，不用刷新时间替代。
+  final DateTime? startedAt;
+  final DateTime? completedAt;
+
+  DateTime? get messageTime => kind == TaskItemKind.user
+      ? startedAt ?? completedAt
+      : completedAt ?? startedAt;
+
   TaskItem copyWith({
     String? text,
     String? title,
@@ -89,6 +99,8 @@ final class TaskItem {
     String? turnId,
     TaskTurnInfo? turn,
     String? phase,
+    DateTime? startedAt,
+    DateTime? completedAt,
   }) => TaskItem(
     id: id,
     kind: kind,
@@ -103,6 +115,8 @@ final class TaskItem {
     turn: turn ?? this.turn,
     phase: phase ?? this.phase,
     changes: changes,
+    startedAt: startedAt ?? this.startedAt,
+    completedAt: completedAt ?? this.completedAt,
   );
 }
 
@@ -473,7 +487,12 @@ final class TaskReducer {
         updatedAt: changedDuringRefresh
             ? current.updatedAt
             : snapshot.updatedAt,
-        items: preserveItems ? current!.items : snapshot.items,
+        items: preserveItems
+            ? current!.items
+            : _preserveKnownItemTimes(
+                snapshot.items,
+                current?.items ?? const [],
+              ),
         ownership: ownership,
         serviceTier: current?.serviceTier,
         revision: current?.revision ?? eventRevision,
@@ -572,7 +591,10 @@ final class TaskReducer {
     final resolved = <TaskItem>[];
     for (final item in olderItems) {
       if (!seen.add(item.id)) continue;
-      resolved.add(currentById[item.id] ?? item);
+      final existing = currentById[item.id];
+      resolved.add(
+        existing == null ? item : _preserveItemTimes(existing, item),
+      );
     }
     _replaceTaskItems(
       current,
@@ -602,6 +624,7 @@ final class TaskReducer {
           kind: TaskItemKind.user,
           text: text,
           status: 'sending',
+          startedAt: DateTime.now().toUtc(),
         ),
       ),
     );
@@ -653,7 +676,7 @@ final class TaskReducer {
         : {for (final item in readToken.items) item.id: item};
     final resolvedLatest = <TaskItem>[];
     final seenLatestIds = <String>{};
-    for (final latest in latestItems) {
+    for (var latest in latestItems) {
       if (!seenLatestIds.add(latest.id)) continue;
       var currentIndex = currentItems.indexWhere(
         (item) => item.id == latest.id,
@@ -666,6 +689,8 @@ final class TaskReducer {
         );
         if (currentIndex != -1) {
           claimedPendingIndices.add(currentIndex);
+          // 乐观消息被服务端 ID 替换时保留发送时间，服务端时间始终优先。
+          latest = _preserveItemTimes(latest, currentItems[currentIndex]);
           pendingReplacements[currentIndex] = latest;
         }
       }
@@ -694,7 +719,9 @@ final class TaskReducer {
 
   void _replaceTaskItems(TaskRecord current, List<TaskItem> items) {
     final tasks = Map<String, TaskRecord>.of(_state.tasks)
-      ..[current.id] = current.copyWith(items: List.unmodifiable(items));
+      ..[current.id] = current.copyWith(
+        items: _preserveKnownItemTimes(items, current.items),
+      );
     _state = TaskState(
       epoch: _state.epoch,
       refreshGeneration: _state.refreshGeneration,
@@ -801,7 +828,7 @@ final class TaskReducer {
           if (index == -1) {
             items.add(changedItem);
           } else {
-            items[index] = changedItem;
+            items[index] = _preserveItemTimes(changedItem, items[index]);
           }
           current = current.copyWith(
             items: List.unmodifiable(items),
@@ -852,11 +879,14 @@ TaskItem _preferCurrentStreamingItem(TaskItem current, TaskItem latest) {
       latest.kind == TaskItemKind.agent &&
       current.text.length > latest.text.length &&
       current.text.startsWith(latest.text)) {
-    return current.copyWith(
-      questions: latest.questions.isEmpty ? null : latest.questions,
+    return _preserveItemTimes(
+      current.copyWith(
+        questions: latest.questions.isEmpty ? null : latest.questions,
+      ),
+      latest,
     );
   }
-  return latest;
+  return _preserveItemTimes(latest, current);
 }
 
 TaskItem _preferItemChangedDuringRead(TaskItem current, TaskItem latest) {
@@ -867,9 +897,9 @@ TaskItem _preferItemChangedDuringRead(TaskItem current, TaskItem latest) {
       current.status != 'completed' &&
       latest.text.length > current.text.length &&
       latest.text.startsWith(current.text)) {
-    return latest;
+    return _preserveItemTimes(latest, current);
   }
-  return current;
+  return _preserveItemTimes(current, latest);
 }
 
 List<TaskItem> _mergeOrderedPage(
@@ -903,12 +933,37 @@ List<TaskItem> _mergeOrderedPage(
   return result;
 }
 
+/// 分页、刷新和完成通知可能省略时间字段，不能覆盖已经收到的时间。
+TaskItem _preserveItemTimes(TaskItem preferred, TaskItem previous) {
+  final startedAt = preferred.startedAt ?? previous.startedAt;
+  final completedAt = preferred.completedAt ?? previous.completedAt;
+  if (startedAt == preferred.startedAt &&
+      completedAt == preferred.completedAt) {
+    return preferred;
+  }
+  return preferred.copyWith(startedAt: startedAt, completedAt: completedAt);
+}
+
+List<TaskItem> _preserveKnownItemTimes(
+  List<TaskItem> items,
+  List<TaskItem> current,
+) {
+  final previous = {for (final item in current) item.id: item};
+  return List.unmodifiable([
+    for (final item in items)
+      if (previous[item.id] case final existing?)
+        _preserveItemTimes(item, existing)
+      else
+        item,
+  ]);
+}
+
 List<TaskItem> _mergeItems(List<TaskItem> snapshot, List<TaskItem> current) {
   final items = <String, TaskItem>{
     for (final item in snapshot) item.id: item,
     for (final item in current) item.id: item,
   };
-  return List.unmodifiable(items.values);
+  return _preserveKnownItemTimes(items.values.toList(), snapshot);
 }
 
 TaskOwnership _ownershipFor(

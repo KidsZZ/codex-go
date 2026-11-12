@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:codex_go/shared/formatting/local_time.dart';
 import 'package:codex_go/domain/conversations/task_reducer.dart';
 import 'package:codex_go/features/conversation/conversation_search.dart';
 import 'package:codex_go/features/conversation/conversation_manager.dart';
@@ -601,17 +601,8 @@ class _ConversationRow extends StatelessWidget {
         .lastOrNull
         ?.text
         .replaceAll(RegExp(r'\s+'), ' ');
-    // 使用设备本地时区精确到分钟；当天省略日期，跨年保留年份。
-    final updatedAt = task.updatedAt.toLocal();
-    final now = DateTime.now();
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final timeLabel = DateUtils.isSameDay(updatedAt, now)
-        ? DateFormat.Hm(locale).format(updatedAt)
-        : (updatedAt.year == now.year
-                  ? DateFormat.Md(locale)
-                  : DateFormat.yMd(locale))
-              .add_Hm()
-              .format(updatedAt);
+    final timeLabel = formatLocalTime(task.updatedAt, locale);
     final tone = attention
         ? colors.tertiary
         : running
@@ -718,9 +709,7 @@ class _ConversationRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Tooltip(
-                      message: DateFormat.yMd(locale)
-                          .add_Hm()
-                          .format(updatedAt),
+                      message: formatFullLocalTime(task.updatedAt, locale),
                       child: Text(
                         timeLabel,
                         style: TextStyle(
