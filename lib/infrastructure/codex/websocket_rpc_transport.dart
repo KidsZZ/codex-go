@@ -1,0 +1,65 @@
+// 基于 Android-SSH-Codex 的已验证实现改编；原作者版权与 MIT 许可见 LICENSE。
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+import 'package:codex_go/infrastructure/platform/diagnostics.dart';
+import 'package:codex_go/infrastructure/ssh/connection_setup.dart';
+import 'package:codex_go/infrastructure/codex/rpc_transport.dart';
+
+final class WebSocketRpcTransport implements RpcTransport {
+  WebSocketRpcTransport._(this._channel);
+
+  final WebSocketChannel _channel;
+  bool _localClose = false;
+
+  static Future<WebSocketRpcTransport> connect(Uri uri) async {
+    final channel = WebSocketChannel.connect(uri);
+    try {
+      await channel.ready.timeout(const Duration(seconds: 12));
+    } catch (_) {
+      unawaited(
+        boundedConnectionCleanup('failedWebSocket', () async {
+          await channel.sink.close();
+        }),
+      );
+      rethrow;
+    }
+    return WebSocketRpcTransport._(channel);
+  }
+
+  @override
+  Stream<String> get messages => _channel.stream
+      .transform<dynamic>(
+        StreamTransformer<dynamic, dynamic>.fromHandlers(
+          handleDone: (sink) {
+            Diagnostics.record('websocket.done', {
+              'closeCode': _channel.closeCode,
+              'localCloseRequested': _localClose,
+              'closeReasonPresent': _channel.closeReason?.isNotEmpty == true,
+              'reason': _localClose
+                  ? 'local_close'
+                  : _channel.closeCode == 1006
+                  ? 'abnormal_close_without_frame'
+                  : 'websocket_close_code',
+            });
+            sink.close();
+          },
+        ),
+      )
+      .map((message) {
+        if (message is String) return message;
+        if (message is List<int>) return utf8.decode(message);
+        return message.toString();
+      });
+
+  @override
+  void send(String message) => _channel.sink.add(message);
+
+  @override
+  Future<void> close() {
+    _localClose = true;
+    return _channel.sink.close();
+  }
+}

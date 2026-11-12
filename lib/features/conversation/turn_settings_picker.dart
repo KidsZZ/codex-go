@@ -1,0 +1,343 @@
+// 基于 Android-SSH-Codex 的已验证实现改编；原作者版权与 MIT 许可见 LICENSE。
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import 'package:codex_go/infrastructure/codex/codex_remote_api.dart';
+import 'package:codex_go/infrastructure/platform/account_usage.dart';
+import 'package:codex_go/features/conversation/widgets/account_usage_panel.dart';
+
+import 'package:codex_go/domain/conversations/turn_settings.dart';
+import 'package:codex_go/l10n/strings.dart';
+
+export 'package:codex_go/domain/conversations/turn_settings.dart';
+
+class TurnSettingsPicker extends StatelessWidget {
+  const TurnSettingsPicker({
+    required this.models,
+    required this.value,
+    required this.onChanged,
+    this.enabled = true,
+    this.useCatalogDefault = true,
+    this.inheritedServiceTier,
+    this.accountUsage,
+    super.key,
+  });
+
+  final List<RemoteModel> models;
+  final TurnSettings value;
+  final ValueChanged<TurnSettings> onChanged;
+  final bool enabled;
+  final bool useCatalogDefault;
+  final String? inheritedServiceTier;
+  final AccountUsageController? accountUsage;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = resolveTurnSettings(
+      models,
+      value,
+      useCatalogDefault: useCatalogDefault,
+    );
+    final model = _selectedModel(models, settings);
+    final tier =
+        settings.serviceTier ??
+        inheritedServiceTier ??
+        (useCatalogDefault ? model?.defaultServiceTier : null);
+    final speed = isUltraFastTier(tier)
+        ? ' · ${context.l10n.ultraFastSpeed}'
+        : tier == 'fast' || tier == 'priority'
+        ? ' · ${context.l10n.fastSpeed}'
+        : '';
+    final label = settings.model == null
+        ? context.l10n.followThreadModel
+        : '${model?.displayName ?? settings.model} · '
+              '${context.l10n.effort(settings.effort)}$speed';
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton(
+        key: const Key('turn-settings-selector'),
+        style: OutlinedButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+        ),
+        onPressed: enabled && (models.isNotEmpty || accountUsage != null)
+            ? () async {
+                FocusScope.of(context).unfocus();
+                if (accountUsage != null) unawaited(accountUsage!.refresh());
+                final selection = await showModalBottomSheet<TurnSettings>(
+                  context: context,
+                  isScrollControlled: true,
+                  showDragHandle: true,
+                  builder: (_) => _TurnSettingsSheet(
+                    models: models,
+                    value: settings,
+                    inheritedServiceTier: inheritedServiceTier,
+                    useCatalogDefault: useCatalogDefault,
+                    accountUsage: accountUsage,
+                  ),
+                );
+                if (context.mounted && selection != null) onChanged(selection);
+              }
+            : null,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.memory_outlined, size: 18),
+            const SizedBox(width: 8),
+            Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+            const SizedBox(width: 4),
+            const Icon(Icons.expand_more, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TurnSettingsSheet extends StatefulWidget {
+  const _TurnSettingsSheet({
+    required this.models,
+    required this.value,
+    this.inheritedServiceTier,
+    this.useCatalogDefault = true,
+    this.accountUsage,
+  });
+
+  final List<RemoteModel> models;
+  final TurnSettings value;
+  final String? inheritedServiceTier;
+  final bool useCatalogDefault;
+  final AccountUsageController? accountUsage;
+
+  @override
+  State<_TurnSettingsSheet> createState() => _TurnSettingsSheetState();
+}
+
+class _TurnSettingsSheetState extends State<_TurnSettingsSheet> {
+  late TurnSettings _draft = widget.value;
+
+  String? get _effectiveTier =>
+      _draft.serviceTier ??
+      widget.inheritedServiceTier ??
+      (widget.useCatalogDefault
+          ? _selectedModel(widget.models, _draft)?.defaultServiceTier
+          : null);
+  bool get _fast => _effectiveTier == 'fast' || _effectiveTier == 'priority';
+  bool get _ultraFast => isUltraFastTier(_effectiveTier);
+
+  String? _speedFor(RemoteModel candidate) {
+    if (_fast) {
+      if (!candidate.supportsFast) return 'default';
+      if (_draft.serviceTier != null) return candidate.fastServiceTier;
+    }
+    if (_ultraFast) {
+      if (candidate.ultraFastServiceTier == null) return 'default';
+      if (_draft.serviceTier != null) return candidate.ultraFastServiceTier;
+    }
+    return _draft.serviceTier;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final model = _selectedModel(widget.models, _draft);
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: math.min(560, MediaQuery.sizeOf(context).height * 0.75),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                context.l10n.modelAndReasoningEffort,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: [
+                  if (widget.accountUsage != null)
+                    AccountUsagePanel(controller: widget.accountUsage!),
+                  if (model == null && _draft.model != null)
+                    ListTile(
+                      title: Text(_draft.model!),
+                      subtitle: Text(context.l10n.currentTaskModel),
+                      trailing: const Icon(Icons.check),
+                    ),
+                  for (final candidate in widget.models)
+                    ListTile(
+                      key: ValueKey('turn-model-${candidate.model}'),
+                      title: Text(candidate.displayName),
+                      subtitle: candidate.description.isEmpty
+                          ? null
+                          : Text(
+                              candidate.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                      selected: candidate.model == _draft.model,
+                      trailing: candidate.model == _draft.model
+                          ? const Icon(Icons.check)
+                          : null,
+                      onTap: () => setState(() {
+                        if (candidate.model == _draft.model) return;
+                        _draft = TurnSettings(
+                          model: candidate.model,
+                          effort: candidate.defaultReasoningEffort,
+                          serviceTier: _speedFor(candidate),
+                        );
+                      }),
+                    ),
+                ],
+              ),
+            ),
+            if (model != null) ...[
+              const Divider(height: 1),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: math.min(
+                    160,
+                    MediaQuery.sizeOf(context).height * 0.2,
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SwitchListTile.adaptive(
+                        key: const Key('turn-fast-toggle'),
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(context.l10n.fastNextNewTurn),
+                        subtitle: Text(
+                          model.supportsFast
+                              ? context
+                                    .l10n
+                                    .higherUsageSteerKeepsTheRunningTurnUnchanged
+                              : context.l10n.notAdvertisedByThisModelServer,
+                        ),
+                        value: _fast,
+                        onChanged: model.supportsFast || _fast
+                            ? (enabled) => setState(() {
+                                _draft = TurnSettings(
+                                  model: _draft.model,
+                                  effort: _draft.effort,
+                                  serviceTier: enabled
+                                      ? model.fastServiceTier
+                                      : 'default',
+                                );
+                              })
+                            : null,
+                      ),
+                      if (model.ultraFastServiceTier != null || _ultraFast)
+                        SwitchListTile.adaptive(
+                          key: const Key('turn-ultrafast-toggle'),
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          title: Text(context.l10n.ultraFastNextNewTurn),
+                          subtitle: Text(
+                            context.l10n.higherUsageReplacesFastForThisTurn,
+                          ),
+                          value: _ultraFast,
+                          onChanged:
+                              model.ultraFastServiceTier != null || _ultraFast
+                              ? (enabled) => setState(() {
+                                  _draft = TurnSettings(
+                                    model: _draft.model,
+                                    effort: _draft.effort,
+                                    serviceTier: enabled
+                                        ? model.ultraFastServiceTier
+                                        : 'default',
+                                  );
+                                })
+                              : null,
+                        ),
+                      if (_draft.serviceTier != null)
+                        TextButton(
+                          key: const Key('turn-fast-inherit'),
+                          onPressed: () => setState(() {
+                            _draft = TurnSettings(
+                              model: _draft.model,
+                              effort: _draft.effort,
+                            );
+                          }),
+                          child: Text(context.l10n.followThreadSpeedSetting),
+                        ),
+                      Text(context.l10n.reasoningEffort),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          for (final option in _effortsFor(model))
+                            Tooltip(
+                              message: option.description,
+                              child: ChoiceChip(
+                                key: ValueKey('turn-effort-${option.effort}'),
+                                label: Text(context.l10n.effort(option.effort)),
+                                selected: option.effort == _draft.effort,
+                                onSelected: (_) => setState(() {
+                                  _draft = TurnSettings(
+                                    model: model.model,
+                                    effort: option.effort,
+                                    serviceTier: _draft.serviceTier,
+                                  );
+                                }),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: FilledButton(
+                key: const Key('turn-settings-apply'),
+                onPressed: _draft.model == null
+                    ? null
+                    : () => Navigator.pop(context, _draft),
+                child: Text(context.l10n.apply),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+RemoteModel? _selectedModel(List<RemoteModel> models, TurnSettings value) =>
+    models.where((candidate) => candidate.model == value.model).firstOrNull;
+
+List<RemoteReasoningEffort> _effortsFor(RemoteModel model) {
+  if (model.supportedReasoningEfforts.any(
+    (item) => item.effort == model.defaultReasoningEffort,
+  )) {
+    return model.supportedReasoningEfforts;
+  }
+  return [
+    RemoteReasoningEffort(
+      effort: model.defaultReasoningEffort,
+      description: '',
+    ),
+    ...model.supportedReasoningEfforts,
+  ];
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull {
+    final iterator = this.iterator;
+    return iterator.moveNext() ? iterator.current : null;
+  }
+}

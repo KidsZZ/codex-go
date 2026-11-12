@@ -1,0 +1,814 @@
+{
+  "@@locale": "en",
+  "hostsAndConnections": "Hosts & connections",
+  "backToChat": "Back to chat",
+  "clearConnectionLogsQuestion": "Clear connection logs?",
+  "deleteDiagnosticLogsStoredInThisAppChats": "Delete diagnostic logs stored in this app. Chats, queued messages, hosts and exported files are not affected. New events will continue to be recorded.",
+  "cancel": "Cancel",
+  "clearLogs": "Clear logs",
+  "connectionLogsCleared": "Connection logs cleared",
+  "couldNotClearLogsTryAgain": "Could not clear logs. Try again.",
+  "connectionDiagnosticsSaved": "Connection diagnostics saved",
+  "couldNotExportDiagnosticsTryAgain": "Could not export diagnostics. Try again.",
+  "connectionDiagnostics": "Connection diagnostics",
+  "exportConnectionDiagnostics": "Export connection diagnostics",
+  "clearConnectionLogs": "Clear connection logs",
+  "connecting": "Connecting",
+  "connected": "Connected",
+  "disconnected": "Disconnected",
+  "reconnectHost": "Reconnect {arg1}",
+  "@reconnectHost": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "disconnectHost": "Disconnect from {arg1}",
+  "@disconnectHost": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "dismiss": "Dismiss",
+  "trustThisHostQuestion": "Trust this host?",
+  "trust": "Trust",
+  "commandGoal": "View or edit the task goal",
+  "commandCompact": "Compact older task context",
+  "commandSkills": "Choose an enabled project skill",
+  "commandMcp": "View configured MCP servers and tools",
+  "commandPermissions": "Choose permissions for the next new turn",
+  "commandInterrupt": "Stop the active turn",
+  "offlineCached": "Offline · Showing cached content",
+  "pauseGoal": "Pause goal",
+  "resumeGoal": "Resume goal",
+  "welcomeConnected": "Bring your ideas to life",
+  "welcomeOffline": "Your remote workspace, wherever you are",
+  "welcomeConnectedDescription": "Describe a task and let Codex continue in your workspace.",
+  "welcomeOfflineDescription": "Connect your SSH host to continue with Codex.",
+  "connectHost": "Connect host",
+  "understandProject": "Explore a project",
+  "understandProjectPrompt": "Analyze this project's structure, core features and how to run it.",
+  "debugProject": "Investigate an issue",
+  "debugProjectPrompt": "Help me investigate this issue in the project:",
+  "buildFeature": "Build a feature",
+  "buildFeaturePrompt": "I would like to implement this in the project:",
+  "workingDirectoryOptional": "Working directory (optional)",
+  "workingDirectoryHint": "Leave empty to use the remote default",
+  "executionProcess": "Execution process",
+  "executionProcessDescription": "Commands, reasoning, file changes and tool output",
+  "codexWorking": "Codex is working",
+  "sendModeTitle": "Send mode",
+  "queueDescription": "The queue is saved on this device and sends while the app stays connected.",
+  "steerCurrentTurn": "Steer the current turn",
+  "queueNextTurn": "Queue for the next turn",
+  "interruptAndSend": "Interrupt and send",
+  "sendAutomatically": "Send automatically",
+  "retryFailedAttachmentsBeforeSending": "Retry failed attachments before sending.",
+  "waitForAttachmentsToFinishUploading": "Wait for attachments to finish uploading.",
+  "messageQueuedForTheNextTurn": "Message queued for the next turn.",
+  "upTo4AttachmentsPerMessage": "Up to 4 attachments per message.",
+  "waitingForConnection": "Waiting for connection",
+  "uploadFailedTapToResume": "Upload failed. Tap to resume.",
+  "uploadPercent": "Uploading {arg1}%",
+  "@uploadPercent": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "uploaded": "Uploaded",
+  "attachmentWaiting": "{arg1} · Waiting for connection",
+  "@attachmentWaiting": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "removeAttachment": "Remove attachment",
+  "imagePreviewIsTooLarge": "Image preview is too large",
+  "cannotPreviewImageMaximum10Mib": "Cannot preview image (maximum 10 MiB).",
+  "sendThisMessageAgainQuestion": "Send this message again?",
+  "checkTheLatestConversationFirstIfTheServer": "Check the latest conversation first. If the server already received this message, sending it again may execute it twice.",
+  "sendAgain": "Send again",
+  "answerInFork": "Answer again in a new branch",
+  "editInFork": "Edit and send in a new branch",
+  "forkThroughThisTurn": "Fork through this turn",
+  "revertFromThisTurn": "Revert from this turn",
+  "editPrompt": "Edit prompt",
+  "forkAndSend": "Create branch and send",
+  "revertConversationQuestion": "Revert conversation?",
+  "removeThisTurnAndAllLaterTurnsFrom": "Remove this turn and all later turns from conversation history. Files are NOT reverted. Fork first if you want to keep a copy.",
+  "revert": "Revert",
+  "chooseASkill": "Choose a skill",
+  "noEnabledSkillsAreAvailableForThisProject": "No enabled skills are available for this project.",
+  "mcpServersAndTools": "MCP servers and tools",
+  "noConfiguredMcpServersWereReturnedForThis": "No configured MCP servers were returned for this task.",
+  "close": "Close",
+  "taskGoal": "Task goal",
+  "objective": "Objective",
+  "whatShouldThisTaskAccomplishQuestion": "What should this task accomplish?",
+  "tokenBudgetOptional": "Token budget (optional)",
+  "clearGoal": "Clear goal",
+  "save": "Save",
+  "tokenBudgetMustBeAWholeNumber": "Token budget must be a whole number.",
+  "compactContextQuestion": "Compact context?",
+  "codexWillSummarizeOlderContextToMakeMore": "Codex will summarize older context to make more room in this task.",
+  "compact": "Compact",
+  "queuedMessages": "Queued messages ({arg1})",
+  "@queuedMessages": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "deliveryUnknownCheckConversationBeforeRetrying": "Delivery unknown · Check conversation before retrying",
+  "notSentRetryOrRemove": "Not sent · Retry or remove",
+  "steerQueuedMessage": "Steer queued message",
+  "retry": "Retry",
+  "steer": "Steer",
+  "removeQueuedMessage": "Remove queued message",
+  "taskCommands": "Task commands",
+  "permissionsNextNewTurn": "Permissions · next new turn",
+  "rename": "Rename",
+  "pinUnpin": "Pin / unpin",
+  "archive": "Archive",
+  "forkConversation": "Fork conversation",
+  "skills": "Skills",
+  "goal": "Goal",
+  "compactContext": "Compact context",
+  "interruptTurn": "Interrupt turn",
+  "subagentLoadFailed": "Could not load subagent history: {arg1}",
+  "@subagentLoadFailed": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "refreshSubagentHistory": "Refresh subagent history",
+  "readOnlySubagent": "Read-only subagent",
+  "readOnlyLabel": "Read-only · {arg1}",
+  "@readOnlyLabel": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "noTaskEventsYet": "No task events yet",
+  "jumpToLatest": "Jump to latest",
+  "cachedContextMessage": "Showing cached context. {arg1}",
+  "@cachedContextMessage": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "retryEarlierContext": "Retry earlier context",
+  "startOfTask": "Start of task",
+  "loadEarlierContext": "Load earlier context",
+  "conversationsAndWorkspaces": "Conversations & workspaces",
+  "newChat": "New chat",
+  "messagePlaceholder": "Message Codex",
+  "addAttachment": "Add image or file",
+  "image": "Image",
+  "fileOrVideo": "File or video",
+  "runningComposerHint": "Running · Steer or queue a message",
+  "remoteComposerHint": "Run in the remote workspace",
+  "localDraftHint": "Draft saved on this device",
+  "stopGenerating": "Stop generating",
+  "sendMessage": "Send message",
+  "steerTurnAction": "Steer current turn",
+  "queueMessage": "Queue message",
+  "messageDeliveryMode": "Message delivery mode",
+  "automaticModeDescription": "Automatic: start or steer",
+  "steerModeDescription": "Steer: guide the current turn",
+  "queueModeDescription": "Queue: send next turn",
+  "automatic": "Auto",
+  "queue": "Queue",
+  "deny": "Deny",
+  "allowForTurn": "Allow for turn",
+  "allowOnce": "Allow once",
+  "allowForSession": "Allow for session",
+  "addProject": "Add project",
+  "editProject": "Edit project",
+  "projectName": "Project name",
+  "remoteWorkingDirectory": "Remote working directory",
+  "syncProjectFailed": "Could not sync project: {arg1}",
+  "@syncProjectFailed": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "deleteProjectQuestion": "Delete project?",
+  "removeLocalProject": "Remove {arg1} from this app? Files and tasks are kept.",
+  "@removeLocalProject": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "removeSharedProject": "Delete shared project {arg1} on all connected clients? Files and tasks are kept; tasks become unassigned.",
+  "@removeSharedProject": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "delete": "Delete",
+  "deleteProjectFailed": "Could not delete project: {arg1}",
+  "@deleteProjectFailed": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "workspaces": "Workspaces",
+  "addSharedProject": "Add shared project",
+  "searchWorkspace": "Search name or directory",
+  "sortRecentModification": "Recently modified first",
+  "refreshTasks": "Refresh tasks",
+  "searchConversations": "Search all conversations",
+  "searchHistoryArchive": "Search history / archive",
+  "chooseWorkspace": "Choose workspace",
+  "allWorkspaces": "All workspaces",
+  "allConversations": "All conversations",
+  "workspaceActions": "Workspace actions",
+  "saveAsSharedProject": "Save as shared project",
+  "deleteSharedProject": "Delete shared project",
+  "all": "All",
+  "running": "Running",
+  "attention": "Needs attention",
+  "unread": "Unread",
+  "noMatchingConversations": "No matching conversations",
+  "connectToViewConversations": "Connect a host to view conversations",
+  "needsConfirmation": "Your confirmation is needed",
+  "searchFailed": "Search failed, tap to retry: {arg1}",
+  "@searchFailed": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "loading": "Loading…",
+  "loadEarlierConversations": "Load earlier conversations",
+  "searchServerHistory": "Search all server history",
+  "pinned": "Pinned",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "pastWeek": "Previous 7 days",
+  "pastMonth": "Previous 30 days",
+  "earlier": "Earlier",
+  "steerDoesNotChangeARunningTurnServer": "Steer does not change a running turn. Server requirements still apply.",
+  "allowFullAccessQuestion": "Allow full access?",
+  "commandsMayAccessFilesAndNetworksOutsideThe": "Commands may access files and networks outside the workspace without approval. Choose only for a trusted task. This cannot bypass server or organization restrictions.",
+  "allowFullAccess": "Allow full access",
+  "permissionsLabel": "Permissions: {arg1}",
+  "@permissionsLabel": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "manageTasks": "Manage tasks",
+  "searchAllTasks": "Search all tasks",
+  "archived": "Archived",
+  "unpin": "Unpin",
+  "pin": "Pin",
+  "restore": "Restore",
+  "noTasksFound": "No tasks found",
+  "loadMore": "Load more",
+  "renameTask": "Rename task",
+  "archiveTaskQuestion": "Archive task?",
+  "thisHidesTheTaskAndMayArchiveIts": "This hides the task and may archive its child tasks. You can restore it from Manage tasks → Archived.",
+  "addSshHost": "Add SSH host",
+  "editSshHost": "Edit SSH host",
+  "secureConnectionHint": "Connect your workspace securely over SSH. Your credentials stay on this device.",
+  "connectionDetails": "Connection details",
+  "hostName": "Name",
+  "myDevelopmentMachine": "My development machine",
+  "hostNameOrIp": "Host name or IP",
+  "sshUser": "User",
+  "port": "Port",
+  "importSshConfig": "Import SSH config",
+  "sshConfigContents": "~/.ssh/config contents",
+  "hostAlias": "Host alias",
+  "importConfig": "Import",
+  "authentication": "Authentication",
+  "password": "Password",
+  "privateKey": "Private key",
+  "hidePassword": "Hide password",
+  "showPassword": "Show password",
+  "opensshPrivateKey": "OpenSSH private key",
+  "keyPassphrase": "Key passphrase",
+  "codexService": "Codex service",
+  "sharedMode": "Shared",
+  "sharedModeDescription": "Recommended. Reuse the Codex service and conversations on your computer.",
+  "customMode": "Custom",
+  "customModeDescription": "Connect to an existing Unix socket at the path you specify.",
+  "appServerUnixSocket": "App-server Unix socket",
+  "isolatedMode": "Isolated",
+  "isolatedModeDescription": "Start a dedicated app-server for this SSH connection.",
+  "advancedSsh": "Advanced SSH",
+  "jumpHostTimeoutsAndEnvironmentVariables": "Jump host, timeouts and environment variables",
+  "useJumpHost": "Use jump host",
+  "phoneJumpHostTargetOneProxyjumpHop": "Phone → jump host → target. One ProxyJump hop.",
+  "jumpHostNameOrIp": "Jump host name or IP",
+  "jumpUser": "Jump user",
+  "jumpPort": "Jump port",
+  "jumpPassword": "Jump password",
+  "jumpOpensshPrivateKey": "Jump OpenSSH private key",
+  "jumpKeyPassphrase": "Jump key passphrase",
+  "jumpCredentialsAreIndependentLeaveUnusedFieldsEmpty": "Jump credentials are independent. Leave unused fields empty. Each SSH server verifies its own host key.",
+  "connectTimeoutSeconds": "Connect timeout (seconds)",
+  "authenticationTimeoutSeconds": "Authentication timeout (seconds)",
+  "keepaliveIntervalSeconds": "Keepalive interval (seconds)",
+  "keepAliveHelp": "0 disables periodic SSH pings. Default: 15 seconds.",
+  "environmentVariables": "Environment variables",
+  "requiredField": "Required",
+  "secondsRangeError": "Enter {arg1}–{arg2} seconds.",
+  "@secondsRangeError": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      },
+      "arg2": {
+        "type": "Object"
+      }
+    }
+  },
+  "invalidPort": "Invalid port",
+  "enterAnAbsoluteUnixSocketPath": "Enter an absolute Unix socket path.",
+  "reconnectSshBeforeOpeningTheRemoteLocalhostLink": "Reconnect SSH before opening the remote localhost link.",
+  "forwardRemotePortQuestion": "Forward remote port?",
+  "confirmForwardPort": "Open {arg1}:{arg2} on {arg3} through SSH?\n\nThe phone listener binds only to 127.0.0.1, not the LAN. You can change or stop it in Ports. This does not use the phone’s own localhost service.",
+  "@confirmForwardPort": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      },
+      "arg2": {
+        "type": "Object"
+      },
+      "arg3": {
+        "type": "Object"
+      }
+    }
+  },
+  "forwardAndOpen": "Forward and open",
+  "couldNotOpenTheBrowser": "Could not open the browser.",
+  "removeForwardingRuleQuestion": "Remove forwarding rule?",
+  "removeForwardingDescription": "{arg1}\nCurrent connections will close.",
+  "@removeForwardingDescription": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "remove": "Remove",
+  "localAddressCopied": "Local address copied",
+  "portsForHost": "Ports · {arg1}",
+  "@portsForHost": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "discoverListeningPorts": "Discover listening ports",
+  "addForwardingRule": "Add forwarding rule",
+  "hostChangedCloseAndReopenPorts": "Host changed. Close and reopen Ports.",
+  "offlineEnabledRulesResumeWhenThisHostReconnects": "Offline · Enabled rules resume when this host reconnects.",
+  "noForwardedPortsAddOneChooseADetected": "No forwarded ports. Add one, choose a detected port, or tap a localhost HTTP link in a conversation.",
+  "detectedOnTheSshHost": "Detected on the SSH host",
+  "detectedListenerNotForwardedYet": "Detected listener · not forwarded yet",
+  "forward": "Forward",
+  "phoneSshHostTcpListensOnlyOn127": "Phone → SSH host (TCP). Listens only on 127.0.0.1. A listening tunnel does not guarantee the remote service is ready.",
+  "portActions": "Port actions",
+  "editPorts": "Edit ports",
+  "openInApp": "Open in app",
+  "openInExternalBrowser": "Open in external browser",
+  "copyLocalAddress": "Copy local address",
+  "retryForwarding": "Retry forwarding",
+  "removeRule": "Remove rule",
+  "stopped": "Stopped",
+  "listeningConnections": "Listening locally · {arg1} connection(s)",
+  "@listeningConnections": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "forwardingFailed": "Forwarding failed",
+  "waitingForSsh": "Waiting for SSH",
+  "forwardAPort": "Forward a port",
+  "editForwarding": "Edit forwarding",
+  "hostReachedFromSshServer": "Host reached from SSH server",
+  "remotePort165535": "Remote port (1–65535)",
+  "phonePort0Auto": "Phone port (0 = Auto)",
+  "autoTriesTheRemotePortThenAnAvailable": "Auto tries the remote port, then an available port.",
+  "labelOptional": "Label (optional)",
+  "httpsBrowserLink": "HTTPS browser link",
+  "tcpForwardingAlsoWorksForNonWebServices": "TCP forwarding also works for non-web services.",
+  "changingTheRouteClosesItsCurrentClientConnections": "Changing the route closes its current client connections.",
+  "followThreadModel": "Follow thread model",
+  "modelAndReasoningEffort": "Model and reasoning effort",
+  "currentTaskModel": "Current task model",
+  "fastNextNewTurn": "Fast · next new turn",
+  "higherUsageSteerKeepsTheRunningTurnUnchanged": "Higher usage · Steer keeps the running turn unchanged",
+  "notAdvertisedByThisModelServer": "Not advertised by this model/server",
+  "ultraFastNextNewTurn": "Ultra Fast · next new turn",
+  "higherUsageReplacesFastForThisTurn": "Higher usage · replaces Fast for this turn",
+  "followThreadSpeedSetting": "Follow thread speed setting",
+  "reasoningEffort": "Reasoning effort",
+  "apply": "Apply",
+  "addHost": "Add host",
+  "removeHostQuestion": "Remove host?",
+  "removeHostDescription": "Remove {arg1} and its stored credentials?",
+  "@removeHostDescription": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "connectYourFirstSshHost": "Connect your first SSH host",
+  "editHost": "Edit host",
+  "hostActions": "Host actions",
+  "connect": "Connect",
+  "onlyForwardedLoopbackHttpSPagesCanBe": "Only forwarded loopback HTTP(S) pages can be previewed.",
+  "zoomOut": "Zoom out",
+  "zoomIn": "Zoom in",
+  "resetZoom": "Reset zoom",
+  "imageFormatIsNotSupported": "Image format is not supported.",
+  "offline": "Offline",
+  "subscriptionUsage": "Subscription usage",
+  "refreshUsage": "Refresh usage",
+  "connectToViewTheRemoteAccountUsage": "Connect to view the remote account usage.",
+  "showingPreviousUsageRefreshFailedRetry": "Showing previous usage. Refresh failed; retry.",
+  "usageUnavailableForThisServerAccount": "Usage unavailable for this server/account.",
+  "primary": "Primary",
+  "secondary": "Secondary",
+  "connectedServerAccountNotAMessageCount": "Connected server account · Not a message count",
+  "usageResets": "Resets {arg1}",
+  "@usageResets": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "onlyHttpAndHttpsLinksCanBeOpened": "Only HTTP and HTTPS links can be opened.",
+  "couldNotOpenLink": "Could not open link.",
+  "downloadImage": "Download image",
+  "copyCode": "Copy code",
+  "codeCopied": "Code copied",
+  "couldNotCopyCode": "Could not copy code.",
+  "externalImageBlocked": "External image blocked",
+  "starting": "Starting",
+  "completed": "Completed",
+  "interrupted": "Interrupted",
+  "failed": "Failed",
+  "closed": "Closed",
+  "unavailable": "Unavailable",
+  "copyMessage": "Copy message",
+  "turnActions": "Turn actions",
+  "imageAttachment": "Image attachment",
+  "videoAttachment": "Video attachment",
+  "fileAttachment": "File attachment",
+  "imageLocationIsNotAvailableInThisConversation": "Image location is not available in this conversation.",
+  "embeddedImage": "Embedded image",
+  "download": "Download",
+  "couldNotLoadImageReconnectAndTryAgain": "Could not load image. Reconnect and try again (maximum 10 MiB).",
+  "previewImage": "Preview image",
+  "copyPath": "Copy path",
+  "messageCopied": "Message copied",
+  "couldNotCopyMessage": "Could not copy message.",
+  "command": "Command",
+  "fileChanges": "File changes",
+  "tool": "Tool",
+  "reasoning": "Reasoning",
+  "activity": "Activity",
+  "everyQuestionNeedsAnAnswer": "Every question needs an answer.",
+  "couldNotSendAnswersTryAgain": "Could not send answers. Try again.",
+  "answered": "Answered",
+  "yourResponse": "Your response",
+  "answer": "Answer",
+  "submitAnswers": "Submit answers",
+  "loadingVideo": "Loading video",
+  "connectionInterruptedReconnectingAndResuming": "Connection interrupted. Reconnecting and resuming…",
+  "verifyingFileIntegrity": "Verifying file integrity…",
+  "cancelLoading": "Cancel loading",
+  "videoPlaybackFailed": "Video playback failed ({arg1}).",
+  "@videoPlaybackFailed": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "playVideo": "Play video",
+  "downloadVideo": "Download video",
+  "downloadRemoteFileQuestion": "Download remote file?",
+  "downloadFileDescription": "{arg1}\n\nMaximum 1 GiB. Choose a save location after downloading.",
+  "@downloadFileDescription": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "downloadFile": "Download file",
+  "chooseALocationThenSaving": "Choose a location, then saving…",
+  "cancelDownload": "Cancel download",
+  "fileSaved": "File saved",
+  "saveCancelled": "Save cancelled",
+  "downloadCancelled": "Download cancelled.",
+  "downloadTimedOutCheckTheConnectionAndRetry": "Download timed out. Check the connection and retry.",
+  "phoneTemporaryStorageCouldNotBeWrittenCheck": "Phone temporary storage could not be written. Check free space.",
+  "saveOnPhoneFailed": "Could not save on the phone ({arg1}). Choose another location.",
+  "@saveOnPhoneFailed": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "downloadFailedReason": "Download failed: {arg1}",
+  "@downloadFailedReason": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "downloadFailedConnection": "Download failed ({arg1}). Check the SSH connection and retry.",
+  "@downloadFailedConnection": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "draft": "Draft",
+  "changesStaged": "Changes staged",
+  "commitCreated": "Commit created",
+  "branchCreated": "Branch created",
+  "pushed": "Pushed",
+  "pullRequest": "Pull request",
+  "gitActivity": "Git activity",
+  "answerToContinue": "Answer to continue",
+  "questionsForYou": "Questions for you",
+  "yourAnswer": "Your answer",
+  "skip": "Skip",
+  "completedSteps": "Completed · {arg1} steps{arg2}",
+  "@completedSteps": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      },
+      "arg2": {
+        "type": "Object"
+      }
+    }
+  },
+  "commandCount": "{arg1} commands",
+  "@commandCount": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "fileOperationCount": "{arg1} file operations",
+  "@fileOperationCount": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "viewExecutionProcess": "View reasoning and execution",
+  "changedFileCount": "{arg1} files changed",
+  "@changedFileCount": {
+    "placeholders": {
+      "arg1": {
+        "type": "Object"
+      }
+    }
+  },
+  "copyDiff": "Copy diff",
+  "diffUnavailable": "The server did not provide a diff",
+  "imageUnavailableRetry": "Image unavailable · Retry",
+  "imageLoaderUnavailable": "Image loader unavailable",
+  "unsupportedOrOversizedImage": "Unsupported or oversized image",
+  "imageTooLarge": "Image too large",
+  "imageDimensionsTooLarge": "Image dimensions too large",
+  "sshPorts": "SSH ports",
+  "sshHosts": "SSH hosts",
+  "language": "App language",
+  "languageSystem": "Follow system",
+  "languageDescription": "Choose the language used in menus and controls.",
+  "languageSaveFailed": "Could not save language preference. Please try again.",
+  "hostListDescription": "Your remote development machines",
+  "permissionInherit": "Thread permissions",
+  "permissionInheritDescription": "Use the current thread policy",
+  "permissionReadOnly": "Read only",
+  "permissionReadOnlyDescription": "Read files; changes require approval",
+  "permissionWorkspace": "Workspace",
+  "permissionWorkspaceDescription": "Write in the task workspace; ask before escalation",
+  "permissionFullAccess": "Full access",
+  "permissionFullAccessDescription": "No sandbox or command approval prompts",
+  "effortUnavailable": "Effort unavailable",
+  "effortMinimal": "minimal",
+  "effortLow": "low",
+  "effortMedium": "medium",
+  "effortHigh": "high",
+  "effortXhigh": "xhigh",
+  "effortNone": "none",
+  "fastSpeed": "Fast",
+  "ultraFastSpeed": "Ultra Fast",
+  "secondsRange": "{min}–{max} seconds",
+  "@secondsRange": {
+    "placeholders": {
+      "min": {
+        "type": "Object"
+      },
+      "max": {
+        "type": "Object"
+      }
+    }
+  },
+  "durationSeconds": " · {seconds} sec",
+  "@durationSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "Object"
+      }
+    }
+  },
+  "workEvents": "{count} work events",
+  "@workEvents": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "usageRemaining": "{label} · {percent}% left",
+  "@usageRemaining": {
+    "placeholders": {
+      "label": {
+        "type": "Object"
+      },
+      "percent": {
+        "type": "Object"
+      }
+    }
+  },
+  "statusActive": "Active",
+  "statusPaused": "Paused",
+  "statusPending": "Pending",
+  "statusUnknown": "Unknown",
+  "invalidEnvironment": "Check environment variables: use one NAME=value per line, valid names, no duplicates or control characters.",
+  "importFailed": "Could not import SSH config. Check the configuration and host alias.\n{detail}",
+  "@importFailed": {
+    "placeholders": {
+      "detail": {
+        "type": "Object"
+      }
+    }
+  },
+  "portRangeError": "Enter a port from {min} to 65535.",
+  "@portRangeError": {
+    "placeholders": {
+      "min": {
+        "type": "Object"
+      }
+    }
+  },
+  "environmentMissingEquals": "Environment assignment must contain an equals sign.",
+  "environmentInvalidName": "Invalid environment variable name.",
+  "environmentInvalidValue": "Environment variable value contains a forbidden control character.",
+  "environmentLineError": "Invalid environment assignment on line {line}: {reason}",
+  "@environmentLineError": {
+    "placeholders": {
+      "line": {
+        "type": "Object"
+      },
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "environmentDuplicate": "Duplicate environment variable {name} on line {line}.",
+  "@environmentDuplicate": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "line": {
+        "type": "Object"
+      }
+    }
+  },
+  "navConversations": "Chats",
+  "navWorkspaces": "Workspaces",
+  "navHosts": "Connections",
+  "navSettings": "Settings",
+  "goTagline": "Your workspace, within reach.",
+  "goIntroduction": "Connect your computer and bring your Codex work with you.",
+  "goWelcomeTitle": "Start with your workspace",
+  "goWelcomeBody": "Add an SSH host to continue your workspaces and conversations. Code and execution stay on your computer.",
+  "goAddFirstHost": "Add your first host",
+  "goResume": "Pick up where you left off",
+  "goRecentHint": "Ideas, progress and results, together.",
+  "goNewConversation": "Start a conversation",
+  "goNoConversations": "A fresh start",
+  "goNoConversationsHint": "Choose a workspace or start a conversation.",
+  "goWorkspaceHint": "Sorted by recent activity, from remote projects and conversation folders.",
+  "goNoWorkspaces": "Your workspaces will appear here",
+  "goNoWorkspacesHint": "Connect a host to discover existing folders, or add one yourself.",
+  "goOpenWorkspace": "View conversations",
+  "goNoActivity": "No activity yet",
+  "goDiscovered": "Discovered folder",
+  "goShared": "Shared project",
+  "goWorkspaceName": "Workspace name",
+  "goWorkspacePath": "Remote absolute path",
+  "goAbsolutePath": "Enter an absolute path starting with /",
+  "goConnectionHint": "Your development environments, ready when you need them.",
+  "goConnectionReady": "Connected and ready",
+  "goConnectionSaved": "Host saved. Ready to connect.",
+  "goDisconnect": "Disconnect",
+  "goReconnect": "Reconnect",
+  "goActiveHost": "Current host",
+  "goHostMode": "Service mode",
+  "goConnectionCancelled": "Cancel connection",
+  "goAppearance": "Appearance",
+  "goAppearanceHint": "Make yourself at home",
+  "goThemeSystem": "System",
+  "goThemeLight": "Light",
+  "goThemeDark": "Dark",
+  "goPreferences": "Preferences",
+  "goTools": "Connection tools",
+  "goAbout": "About Codex Go",
+  "goAboutDescription": "An independent mobile client for remote Codex. A workspace-first companion for your development environment.",
+  "goVersion": "Preview 0.1.0",
+  "goLicenses": "Open-source licenses",
+  "goCredits": "Built on SSH, protocol and platform capabilities from Android-SSH-Codex, with a redesigned application structure, workspace navigation and visual system. Interaction design informed by dsh-Go. Not an official OpenAI app.",
+  "goSavePreferenceFailed": "Could not save your preference. Try again.",
+  "goDiagnosticsHint": "Export connection logs to investigate SSH and service issues",
+  "goSearchOffline": "Offline: searching cached conversations only",
+  "goClearSearch": "Clear search",
+  "goSearchHint": "Search titles, content or folders",
+  "goNoSearchResults": "No matching conversations",
+  "goNoSearchHint": "Try another keyword or check all workspaces.",
+  "goActivityFilter": "Needs attention",
+  "goAttentionEmpty": "All caught up",
+  "goAttentionEmptyHint": "Running tasks, approvals and questions appear here.",
+  "goPinnedEmpty": "Keep important conversations close",
+  "goPinnedEmptyHint": "Pin a conversation from its menu to find it here.",
+  "goViewAll": "View all",
+  "goProjectScope": "Current workspace",
+  "goOnlineSearch": "Search remote history",
+  "goHistoryManager": "Archive & history",
+  "goConversationPending": "Waiting for you",
+  "goStartTitle": "What shall we work on?",
+  "goStartBody": "Describe what you want to accomplish. Codex works in your remote environment.",
+  "goContextReady": "Working directory ready",
+  "goWorkspaceOptional": "Choose a workspace to give your conversation a clear context.",
+  "goIdeaUnderstand": "Explore the code",
+  "goIdeaDebug": "Find a bug",
+  "goIdeaBuild": "Build a feature",
+  "goLocalDraft": "Draft saved on this device",
+  "goBackToList": "Back to conversations",
+  "goAllWorkspacesHint": "Recent conversations across this host",
+  "goConfirmRemoveWorkspace": "Remove workspace",
+  "goStatusDetails": "View error details",
+  "goRetryConnection": "Retry connection",
+  "goNoHostSelected": "No host selected",
+  "goBusyConnection": "Wait for the connection before editing hosts",
+  "goWorkspaceUpdated": "Workspace saved",
+  "goArchiveHint": "Find, rename, pin and restore conversations",
+  "goActiveJobs": "Active conversations",
+  "goDeviceOnly": "Stored securely on this device",
+  "goConnectionSecurity": "SSH encryption · Host fingerprint verification",
+  "goNoWorkspacesMatch": "No matching workspaces",
+  "goNoWorkspacesMatchHint": "Try a workspace name or remote path."
+}

@@ -1,0 +1,32 @@
+name: codex_go
+description: A workspace-first mobile companion for remote Codex sessions.
+version: 0.1.0+1
+publish_to: none
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.47.0"
+
+dependencies:
+  collection: ^1.18.0
+  crypto: 3.0.7
+  dartssh2: 2.22.2
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+  flutter_markdown_plus: 1.0.12
+  flutter_secure_storage: 9.2.4
+  markdown: 7.3.1
+  url_launcher: 6.3.1
+  web_socket_channel: 3.0.1
+
+dev_dependencies:
+  flutter_lints: 4.0.0
+
+flutter:
+  generate: true
+  uses-material-design: true
+  assets:
+    - assets/licenses/android-ssh-codex.txt

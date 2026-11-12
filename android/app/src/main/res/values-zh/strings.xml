@@ -1,0 +1,1 @@
+<resources><string name="app_name">Codex Go</string><string name="connection_title">Codex Go 已连接</string><string name="connection_channel">SSH 连接</string><string name="connection_body">保持后台 SSH 会话，打开 Codex Go 可断开连接。</string></resources>

@@ -1,0 +1,1 @@
+<resources><string name="app_name">Codex Go</string><string name="connection_title">Codex Go connection active</string><string name="connection_channel">SSH connection</string><string name="connection_body">Keeps your SSH session available. Open Codex Go to disconnect.</string></resources>

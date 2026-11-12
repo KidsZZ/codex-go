@@ -1,0 +1,708 @@
+// 基于 Android-SSH-Codex 的已验证实现改编；原作者版权与 MIT 许可见 LICENSE。
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+
+import 'package:codex_go/domain/conversations/task_reducer.dart';
+import 'package:codex_go/domain/conversations/message_attachments.dart';
+import 'package:codex_go/features/conversation/widgets/codex_directive_content.dart';
+import 'package:codex_go/features/conversation/widgets/markdown_content.dart';
+import 'package:codex_go/features/conversation/widgets/inline_attachment_image.dart';
+import 'package:codex_go/features/conversation/widgets/remote_file_actions.dart';
+import 'package:codex_go/features/conversation/widgets/task_question_panel.dart';
+import 'package:codex_go/features/conversation/widgets/task_question_content.dart';
+import 'package:codex_go/shared/media/preview_browser.dart';
+import 'package:codex_go/l10n/strings.dart';
+
+typedef MessageTextCopier = Future<void> Function(String text);
+
+Future<void> copyMessageText(String text) => copyMarkdownText(text);
+
+class TimelineItemView extends StatelessWidget {
+  const TimelineItemView({
+    required this.item,
+    this.copyText = copyMessageText,
+    this.loadImage,
+    this.onAnswerQuestions,
+    this.onTurnAction,
+    super.key,
+  });
+
+  final TaskItem item;
+  final MessageTextCopier copyText;
+  final Future<Uint8List> Function(String)? loadImage;
+  final TaskQuestionSubmitter? onAnswerQuestions;
+  final VoidCallback? onTurnAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return ImagePreviewScope(
+      loadImage: loadImage,
+      child: switch (item.kind) {
+        TaskItemKind.user || TaskItemKind.agent => _Message(
+          item: item,
+          copyText: copyText,
+          loadImage: loadImage,
+          onAnswerQuestions: onAnswerQuestions,
+          onTurnAction: onTurnAction,
+        ),
+        _ => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ActivityCard(item: item),
+            for (final attachment in item.attachments)
+              _AttachmentCard(
+                attachment: attachment,
+                copyText: copyText,
+                loadImage: loadImage,
+              ),
+          ],
+        ),
+      },
+    );
+  }
+}
+
+class TimelineActivityGroup extends StatelessWidget {
+  const TimelineActivityGroup({
+    required this.items,
+    this.loadImage,
+    this.onOpenSubagent,
+    super.key,
+  });
+
+  final List<TaskItem> items;
+  final Future<Uint8List> Function(String)? loadImage;
+  final ValueChanged<SubagentReference>? onOpenSubagent;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = items.length;
+    final targets = <String, SubagentReference>{};
+    for (final item in items) {
+      for (final agent in item.subagents) {
+        final previous = targets[agent.threadId];
+        targets[agent.threadId] = SubagentReference(
+          agent.threadId,
+          path: agent.path ?? previous?.path,
+          status: agent.status ?? previous?.status,
+        );
+      }
+    }
+    return ImagePreviewScope(
+      loadImage: loadImage,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Card(
+              key: const Key('activity-group'),
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: ExpansionTile(
+                initiallyExpanded: items.any(
+                  (item) =>
+                      item.status == 'failed' ||
+                      item.turn?.status == 'interrupted',
+                ),
+                dense: true,
+                visualDensity: const VisualDensity(vertical: -3),
+                leading: const Icon(Icons.build_circle_outlined, size: 19),
+                title: Text(context.l10n.workEvents(count)),
+                subtitle: Text(
+                  items
+                      .map(
+                        (item) => item.title ?? _activityLabel(context, item),
+                      )
+                      .join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                children: [
+                  _ActivityViewport(
+                    itemCount: items.length,
+                    itemBuilder: (context, index) => _CompactActivityRow(
+                      key: PageStorageKey('activity-${items[index].id}'),
+                      item: items[index],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (targets.isNotEmpty)
+            _SubagentLinks(
+              agents: targets.values.toList(growable: false),
+              onOpen: onOpenSubagent,
+            ),
+          for (final item in items)
+            for (final attachment in item.attachments)
+              _AttachmentCard(
+                attachment: attachment,
+                copyText: copyMessageText,
+                loadImage: loadImage,
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubagentLinks extends StatelessWidget {
+  const _SubagentLinks({required this.agents, this.onOpen});
+
+  final List<SubagentReference> agents;
+  final ValueChanged<SubagentReference>? onOpen;
+
+  Widget _tile(BuildContext context, SubagentReference agent) => ListTile(
+    dense: true,
+    visualDensity: VisualDensity.compact,
+    leading: const Icon(Icons.account_tree_outlined, size: 20),
+    title: Text(
+      _subagentLabel(context, agent),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+    trailing: onOpen == null ? null : const Icon(Icons.chevron_right),
+    onTap: onOpen == null ? null : () => onOpen!(agent),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 3),
+      clipBehavior: Clip.antiAlias,
+      child: agents.length <= 3
+          ? Column(
+              children: [for (final agent in agents) _tile(context, agent)],
+            )
+          : _ActivityViewport(
+              viewportKey: const Key('subagent-viewport'),
+              maxHeight: 176,
+              itemCount: agents.length,
+              itemBuilder: (_, index) => _tile(context, agents[index]),
+            ),
+    );
+  }
+}
+
+/// Keep the collapse header outside the scrollable details, including when a
+/// single tool output is much taller than the screen.
+class _ActivityViewport extends StatefulWidget {
+  const _ActivityViewport({
+    required this.itemCount,
+    required this.itemBuilder,
+    this.viewportKey = const Key('activity-viewport'),
+    this.maxHeight = 360,
+  });
+
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+  final Key viewportKey;
+  final double maxHeight;
+
+  @override
+  State<_ActivityViewport> createState() => _ActivityViewportState();
+}
+
+class _ActivityViewportState extends State<_ActivityViewport> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final available =
+        media.size.height - media.viewInsets.bottom - media.padding.vertical;
+    final height = (available * 0.4).clamp(80, widget.maxHeight).toDouble();
+    return ConstrainedBox(
+      key: widget.viewportKey,
+      constraints: BoxConstraints(maxHeight: height),
+      child: NotificationListener<ScrollNotification>(
+        // Internal scrolling must not change the chat's follow-latest state.
+        onNotification: (_) => true,
+        child: Scrollbar(
+          controller: _scroll,
+          thumbVisibility: true,
+          child: ListView.builder(
+            controller: _scroll,
+            primary: false,
+            shrinkWrap: true,
+            padding: const EdgeInsets.only(right: 8),
+            itemCount: widget.itemCount,
+            itemBuilder: widget.itemBuilder,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactActivityRow extends StatelessWidget {
+  const _CompactActivityRow({required this.item, super.key});
+
+  final TaskItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = item.detail?.trim();
+    final subtitle = item.text.trim();
+    return ExpansionTile(
+      dense: true,
+      visualDensity: const VisualDensity(vertical: -4),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+      childrenPadding: const EdgeInsets.fromLTRB(38, 0, 8, 8),
+      leading: Icon(
+        _activityIcon(item),
+        size: 17,
+        color: _activityColor(context, item),
+      ),
+      title: Text(
+        item.title ?? _activityLabel(context, item),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: subtitle.isEmpty
+          ? null
+          : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      trailing: item.status == null ? null : _StatusBadge(status: item.status!),
+      showTrailingIcon: detail?.isNotEmpty == true,
+      children: [
+        if (detail?.isNotEmpty == true)
+          Align(
+            // SelectableText/Markdown have internal scrollables. Their
+            // saved offsets must not overwrite ExpansionTile's bool state.
+            key: PageStorageKey('activity-detail-${item.id}'),
+            alignment: Alignment.centerLeft,
+            child: item.kind == TaskItemKind.reasoning
+                ? MarkdownContent(text: detail!)
+                : SelectableText(
+                    detail!,
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
+          ),
+      ],
+    );
+  }
+}
+
+String _subagentLabel(BuildContext context, SubagentReference agent) {
+  final status = switch (agent.status) {
+    'pendingInit' => context.l10n.starting,
+    'running' => context.l10n.running,
+    'completed' => context.l10n.completed,
+    'interrupted' => context.l10n.interrupted,
+    'errored' => context.l10n.failed,
+    'shutdown' => context.l10n.closed,
+    'notFound' => context.l10n.unavailable,
+    final status => status,
+  };
+  return status == null ? agent.label : '${agent.label} · $status';
+}
+
+class _Message extends StatelessWidget {
+  const _Message({
+    required this.item,
+    required this.copyText,
+    this.loadImage,
+    this.onAnswerQuestions,
+    this.onTurnAction,
+  });
+
+  final TaskItem item;
+  final MessageTextCopier copyText;
+  final Future<Uint8List> Function(String)? loadImage;
+  final TaskQuestionSubmitter? onAnswerQuestions;
+  final VoidCallback? onTurnAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = item.kind == TaskItemKind.user;
+    final colors = Theme.of(context).colorScheme;
+    final copyableText = _copyableMessageText(item);
+    final sending = user && item.status == 'sending';
+    final content = parseAttachmentMessage(item.text, item.attachments);
+    final agentText = questionMessageBody(item.text, item.questions);
+    return Align(
+      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 720),
+        margin: EdgeInsets.only(top: user ? 20 : 8, bottom: user ? 16 : 24),
+        padding: EdgeInsets.symmetric(
+          horizontal: user ? 18 : 0,
+          vertical: user ? 12 : 0,
+        ),
+        decoration: BoxDecoration(
+          color: user ? colors.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: user
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
+          children: [
+            if (user)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final attachment in content.attachments)
+                    _AttachmentCard(
+                      attachment: attachment,
+                      copyText: copyText,
+                      loadImage: loadImage,
+                    ),
+                  if (content.text.trim().isNotEmpty)
+                    MarkdownContent(text: content.text, copyText: copyText),
+                ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final attachment in item.attachments)
+                    _AttachmentCard(
+                      attachment: attachment,
+                      copyText: copyText,
+                      loadImage: loadImage,
+                    ),
+                  if (agentText.trim().isNotEmpty)
+                    CodexDirectiveContent(text: agentText, copyText: copyText),
+                  if (item.questions.isNotEmpty)
+                    TaskQuestionPanel(
+                      key: ValueKey('questions-${item.id}'),
+                      questions: item.questions,
+                      onSubmit: onAnswerQuestions,
+                    ),
+                ],
+              ),
+            if (sending || copyableText.isNotEmpty || onTurnAction != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (sending)
+                    const SizedBox(
+                      key: Key('pending-user-progress'),
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                  if (sending && copyableText.isNotEmpty)
+                    const SizedBox(width: 8),
+                  if (copyableText.isNotEmpty)
+                    SizedBox(
+                      width: 28,
+                      height: 24,
+                      child: IconButton(
+                        tooltip: context.l10n.copyMessage,
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 16,
+                        onPressed: () => unawaited(
+                          _copyMessage(context, copyableText, copyText),
+                        ),
+                        icon: const Icon(Icons.copy_all_outlined),
+                      ),
+                    ),
+                  if (onTurnAction != null)
+                    SizedBox(
+                      width: 28,
+                      height: 24,
+                      child: IconButton(
+                        tooltip: context.l10n.turnActions,
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 16,
+                        onPressed: onTurnAction,
+                        icon: const Icon(Icons.more_horiz),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentCard extends StatelessWidget {
+  const _AttachmentCard({
+    required this.attachment,
+    required this.copyText,
+    this.loadImage,
+  });
+
+  final MessageAttachment attachment;
+  final MessageTextCopier copyText;
+  final Future<Uint8List> Function(String)? loadImage;
+
+  @override
+  Widget build(BuildContext context) {
+    final thisContext = context;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (attachment.isVideo && attachment.path.startsWith('/'))
+            RemoteVideoPreview(path: attachment.path, label: attachment.label),
+          if (attachment.isImage &&
+              ((attachment.path.startsWith('/') && loadImage != null) ||
+                  attachment.path.startsWith('data:image/')))
+            InlineAttachmentImage(
+              key: ValueKey(attachment.path),
+              attachment: attachment,
+              loadImage: loadImage,
+            ),
+          ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            leading: Icon(
+              attachment.isImage
+                  ? Icons.image_outlined
+                  : attachment.isVideo
+                  ? Icons.videocam_outlined
+                  : Icons.insert_drive_file_outlined,
+            ),
+            title: Text(
+              attachment.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              attachment.isImage
+                  ? context.l10n.imageAttachment
+                  : attachment.isVideo
+                  ? context.l10n.videoAttachment
+                  : context.l10n.fileAttachment,
+            ),
+            trailing: const Icon(Icons.info_outline, size: 18),
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(
+                  attachment.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                content: SingleChildScrollView(
+                  child: SelectableText(
+                    attachment.path.isEmpty
+                        ? context
+                              .l10n
+                              .imageLocationIsNotAvailableInThisConversation
+                        : attachment.path.startsWith('data:')
+                        ? context.l10n.embeddedImage
+                        : attachment.path,
+                  ),
+                ),
+                actions: [
+                  if (attachment.path.startsWith('/') &&
+                      RemoteFileActions.maybeOf(thisContext) != null)
+                    TextButton(
+                      onPressed: () => unawaited(
+                        showRemoteFileDownload(thisContext, attachment.path),
+                      ),
+                      child: Text(context.l10n.download),
+                    ),
+                  if (attachment.isImage &&
+                      ((attachment.path.startsWith('/') && loadImage != null) ||
+                          attachment.path.startsWith('data:image/')))
+                    TextButton(
+                      onPressed: () async {
+                        final bytes = await loadAttachmentPreview(
+                          attachment,
+                          loadImage,
+                        );
+                        if (!context.mounted) return;
+                        if (bytes == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                context
+                                    .l10n
+                                    .couldNotLoadImageReconnectAndTryAgain,
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        await showImagePreview(
+                          context,
+                          bytes,
+                          label: attachment.label,
+                        );
+                      },
+                      child: Text(context.l10n.previewImage),
+                    ),
+                  if (attachment.path.isNotEmpty &&
+                      !attachment.path.startsWith('data:'))
+                    TextButton(
+                      onPressed: () => unawaited(
+                        _copyMessage(context, attachment.path, copyText),
+                      ),
+                      child: Text(context.l10n.copyPath),
+                    ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(context.l10n.close),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _copyableMessageText(TaskItem item) {
+  if (item.kind != TaskItemKind.agent) return item.text;
+  final parsed = parseCodexDirectiveContent(item.text);
+  return parsed.directives.isEmpty ? item.text : parsed.markdown.trimRight();
+}
+
+Future<void> _copyMessage(
+  BuildContext context,
+  String text,
+  MessageTextCopier copyText,
+) async {
+  try {
+    await copyText(text);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.l10n.messageCopied)));
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.l10n.couldNotCopyMessage)));
+  }
+}
+
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard({required this.item});
+
+  final TaskItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final expandable =
+        item.kind == TaskItemKind.reasoning ||
+        item.detail?.trim().isNotEmpty == true;
+    final detail = item.detail?.trim();
+    final body =
+        item.kind == TaskItemKind.reasoning && detail?.isNotEmpty == true
+        ? '${item.text.trim()}\n\n$detail'
+        : detail?.isNotEmpty == true
+        ? detail!
+        : item.text.trim();
+    final tile = ExpansionTile(
+      leading: Icon(
+        _activityIcon(item),
+        size: 20,
+        color: _activityColor(context, item),
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.title ?? _activityLabel(context, item),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (item.status != null) _StatusBadge(status: item.status!),
+        ],
+      ),
+      subtitle: item.kind == TaskItemKind.reasoning || item.text == body
+          ? null
+          : Text(item.text, maxLines: 2, overflow: TextOverflow.ellipsis),
+      initiallyExpanded: !expandable,
+      showTrailingIcon: expandable,
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      children: [
+        _ActivityViewport(
+          itemCount: 1,
+          itemBuilder: (context, index) => Align(
+            alignment: Alignment.centerLeft,
+            child: item.kind == TaskItemKind.reasoning
+                ? MarkdownContent(text: body)
+                : SelectableText(
+                    body,
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
+          ),
+        ),
+      ],
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: tile,
+      ),
+    );
+  }
+}
+
+IconData _activityIcon(TaskItem item) => switch (item.kind) {
+  TaskItemKind.command => Icons.terminal,
+  TaskItemKind.file => Icons.difference_outlined,
+  TaskItemKind.tool => Icons.build_outlined,
+  TaskItemKind.reasoning => Icons.psychology_outlined,
+  _ => Icons.info_outline,
+};
+
+String _activityLabel(BuildContext context, TaskItem item) =>
+    switch (item.kind) {
+      TaskItemKind.command => context.l10n.command,
+      TaskItemKind.file => context.l10n.fileChanges,
+      TaskItemKind.tool => context.l10n.tool,
+      TaskItemKind.reasoning => context.l10n.reasoning,
+      _ => context.l10n.activity,
+    };
+
+Color _activityColor(BuildContext context, TaskItem item) =>
+    switch (item.kind) {
+      TaskItemKind.command => Theme.of(context).colorScheme.secondary,
+      TaskItemKind.file => Theme.of(context).colorScheme.primary,
+      TaskItemKind.tool => Theme.of(context).colorScheme.tertiary,
+      _ => Theme.of(context).colorScheme.outline,
+    };
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        context.l10n.activityStatus(status).toLowerCase(),
+        style: Theme.of(context).textTheme.labelSmall,
+      ),
+    );
+  }
+}

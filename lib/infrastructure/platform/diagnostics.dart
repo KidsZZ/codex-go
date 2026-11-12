@@ -1,0 +1,112 @@
+// 基于 Android-SSH-Codex 的已验证实现改编；原作者版权与 MIT 许可见 LICENSE。
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:dartssh2/dartssh2.dart';
+
+import 'package:codex_go/infrastructure/ssh/codex_daemon.dart';
+import 'package:codex_go/infrastructure/platform/diagnostics_redaction.dart';
+
+export 'package:codex_go/infrastructure/platform/diagnostics_redaction.dart';
+
+/// Never records RPC payloads. Bootstrap errors get bounded, redacted details.
+abstract final class Diagnostics {
+  static const channel = MethodChannel('codex_go/diagnostics');
+  static int _pending = 0;
+
+  static bool get supported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  static void record(String event, [Map<String, Object?> fields = const {}]) {
+    if (!supported || _pending >= 128) return;
+    _pending++;
+    unawaited(_record(event, fields));
+  }
+
+  static Future<void> _record(String event, Map<String, Object?> fields) async {
+    try {
+      await channel.invokeMethod<void>('record', {
+        'event': event,
+        'time': DateTime.now().toUtc().toIso8601String(),
+        ...fields,
+      });
+    } catch (_) {
+      // Diagnostics must never affect the connection (including older hosts).
+    } finally {
+      _pending--;
+    }
+  }
+
+  static Map<String, Object?> errorFields(
+    Object error, {
+    Iterable<String> sensitiveValues = const [],
+  }) {
+    final types = <String>[];
+    Object cause = error;
+    for (var depth = 0; depth < 8; depth++) {
+      types.add(cause.runtimeType.toString());
+      final nested = switch (cause) {
+        SSHSocketError(:final error) => error,
+        SSHInternalError(:final error) => error,
+        SSHAuthAbortError(:final reason) => reason,
+        _ => null,
+      };
+      if (nested == null || identical(nested, cause)) break;
+      cause = nested;
+    }
+    final osCode = switch (cause) {
+      SocketException(:final osError) => osError?.errorCode,
+      OSError(:final errorCode) => errorCode,
+      _ => null,
+    };
+    // errno names below are Android/Linux values, not proof of who reset TCP.
+    final reason = switch (cause) {
+      CodexBootstrapException(:final reason) => reason,
+      TimeoutException() => 'timeout',
+      SSHAuthFailError() => 'ssh_authentication_failed',
+      SSHHostkeyError() => 'ssh_host_key_rejected',
+      SSHChannelOpenError() => 'ssh_channel_open_rejected',
+      SSHHandshakeError(message: 'Handshake timed out') =>
+        'ssh_handshake_timeout',
+      SocketException() ||
+      OSError() when Platform.isAndroid || Platform.isLinux => switch (osCode) {
+        1 => 'operation_not_permitted',
+        13 => 'access_denied',
+        32 => 'broken_pipe',
+        100 => 'network_down',
+        101 => 'network_unreachable',
+        102 => 'network_reset',
+        103 => 'connection_aborted',
+        104 => 'connection_reset',
+        110 => 'tcp_timeout',
+        111 => 'connection_refused',
+        113 => 'host_unreachable',
+        _ => 'socket_error_unknown',
+      },
+      _ => 'unknown',
+    };
+    return {
+      'errorType': error.runtimeType.toString(),
+      if (cause is CodexBootstrapException) ...{
+        'errorDetail': redactBootstrapDiagnostic(
+          cause.message,
+          sensitiveValues,
+        ),
+        if (cause.exitCode != null) 'exitCode': cause.exitCode,
+        if (cause.exitSignal != null) 'exitSignal': cause.exitSignal,
+      },
+      'errorChain': types,
+      'reason': reason,
+      'reasonEvidence': reason == 'unknown' ? 'unavailable' : 'exception',
+      if (osCode != null) 'osCode': osCode,
+      if (cause is SSHChannelOpenError) 'sshChannelCode': cause.code,
+    };
+  }
+
+  static Future<bool> export() async =>
+      await channel.invokeMethod<bool>('export') ?? false;
+
+  static Future<void> clear() => channel.invokeMethod<void>('clear');
+}
