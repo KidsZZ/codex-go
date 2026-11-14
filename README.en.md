@@ -19,7 +19,7 @@ Screenshots use sample data rendered by the real application. The app supports E
 - Discover workspaces from shared projects and conversation history, ordered by recent activity.
 - Read streaming replies, message timestamps, collapsible work logs, file changes, and diffs. Code blocks support highlighting, copying, and wrapping.
 - Choose models, reasoning effort, and permissions; interrupt, steer, or queue messages; answer questions and approval requests.
-- Upload attachments, preview images and videos, download files, and forward development ports over SSH.
+- Upload attachments; crop and draw on images before upload, undo edits, or keep the original. Preview images and videos, download files, and forward development ports over SSH.
 - Keep drafts and an outgoing queue, reconnect after interruptions, and switch between light and dark themes.
 
 ## Get started

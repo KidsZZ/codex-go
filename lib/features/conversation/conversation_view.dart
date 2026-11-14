@@ -1,3 +1,4 @@
+import 'package:codex_go/features/conversation/image_attachment_editor.dart';
 import 'package:codex_go/domain/conversations/permission_mode.dart';
 import 'package:codex_go/features/conversation/conversation_welcome.dart';
 import 'package:codex_go/features/conversation/widgets/conversation_composer.dart';
@@ -275,7 +276,7 @@ class _ConversationViewState extends State<ConversationView> {
           ),
           ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: math.max(100, (viewport.maxHeight - 80) * .64),
+              maxHeight: math.max(48, viewport.maxHeight * .22),
             ),
             child: SingleChildScrollView(
               reverse: true,
@@ -408,101 +409,89 @@ class _ConversationViewState extends State<ConversationView> {
                     ),
                   if (_sending || _pickingAttachment)
                     const LinearProgressIndicator(minHeight: 2),
-                  ConversationComposer(
-                    settings: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TurnSettingsPicker(
-                          compact: true,
-                          accountUsage: widget.controller.accountUsage,
-                          models: widget.controller.models,
-                          value: resolveTurnSettings(
-                            widget.controller.models,
-                            _turnSettings,
-                            model: task.model,
-                            effort: task.reasoningEffort,
-                            useCatalogDefault: widget.newConversation,
-                          ),
-                          useCatalogDefault: widget.newConversation,
-                          inheritedServiceTier: task.serviceTier,
-                          enabled: !_sending,
-                          onChanged: (value) {
-                            if (draft.disposed) return;
-                            draft.settings = value;
-                            draft.changed();
-                          },
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Wrap(
-                            spacing: 12,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              PermissionPicker(
-                                value: draft.permissionMode,
-                                enabled: !_sending,
-                                onChanged: (value) {
-                                  draft.permissionMode = value;
-                                  draft.changed();
-                                },
-                              ),
-                              SendModePicker(
-                                value: _sendMode,
-                                enabled: !_sending,
-                                onChanged: (mode) {
-                                  setState(() => _sendMode = mode);
-                                  _draft.changed();
-                                },
-                                compact: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    permissionWarning:
-                        draft.permissionMode == PermissionMode.fullAccess,
-                    hasAttachments: _attachments.isNotEmpty,
-                    running: task.status == TaskStatus.running,
-                    connected: widget.controller.isConnected,
-                    onStop: () => _handleCommand(TaskCommand.interrupt),
-                    onSendOptions: _chooseSendAction,
-                    controller: _composer,
-                    focusNode: _composerFocus,
-                    inputEnabled: isTaskComposerInputEnabled(
-                      task: task,
-                      connected: widget.controller.isConnected,
-                    ),
-                    sendEnabled: isTaskComposerSendEnabled(
-                      task: task,
-                      connected: widget.controller.isConnected,
-                      sending: _sending,
-                      attachmentsReady: _attachments.every(
-                        (file) => file.ready,
-                      ),
-                    ),
-                    completions: _completions.isNotEmpty || _loadingSkills
-                        ? _CompletionPicker(
-                            completions: _completions,
-                            loading: _loadingSkills,
-                            onSelected: _selectCompletion,
-                          )
-                        : null,
-                    onSend:
-                        widget.newConversation && !widget.controller.isConnected
-                        ? widget.onConnect
-                        : _send,
-                    sendMode: _sendMode,
-                    onAttach:
-                        Attachments.supported &&
-                            !_sending &&
-                            !_pickingAttachment
-                        ? _pickAttachment
-                        : null,
-                  ),
                 ],
               ),
             ),
+          ),
+          ConversationComposer(
+            maxHeight: math.max(140, viewport.maxHeight * .5),
+            settings: Row(
+              children: [
+                Expanded(
+                  child: TurnSettingsPicker(
+                    compact: true,
+                    accountUsage: widget.controller.accountUsage,
+                    models: widget.controller.models,
+                    value: resolveTurnSettings(
+                      widget.controller.models,
+                      _turnSettings,
+                      model: task.model,
+                      effort: task.reasoningEffort,
+                      useCatalogDefault: widget.newConversation,
+                    ),
+                    useCatalogDefault: widget.newConversation,
+                    inheritedServiceTier: task.serviceTier,
+                    enabled: !_sending,
+                    onChanged: (value) {
+                      if (draft.disposed) return;
+                      draft.settings = value;
+                      draft.changed();
+                    },
+                  ),
+                ),
+                PermissionPicker(
+                  compact: true,
+                  value: draft.permissionMode,
+                  enabled: !_sending,
+                  onChanged: (value) {
+                    draft.permissionMode = value;
+                    draft.changed();
+                  },
+                ),
+                SendModePicker(
+                  value: _sendMode,
+                  enabled: !_sending,
+                  onChanged: (mode) {
+                    setState(() => _sendMode = mode);
+                    _draft.changed();
+                  },
+                  compact: true,
+                ),
+              ],
+            ),
+            permissionWarning:
+                draft.permissionMode == PermissionMode.fullAccess,
+            hasAttachments: _attachments.isNotEmpty,
+            running: task.status == TaskStatus.running,
+            connected: widget.controller.isConnected,
+            onStop: () => _handleCommand(TaskCommand.interrupt),
+            onSendOptions: _chooseSendAction,
+            controller: _composer,
+            focusNode: _composerFocus,
+            inputEnabled: isTaskComposerInputEnabled(
+              task: task,
+              connected: widget.controller.isConnected,
+            ),
+            sendEnabled: isTaskComposerSendEnabled(
+              task: task,
+              connected: widget.controller.isConnected,
+              sending: _sending,
+              attachmentsReady: _attachments.every((file) => file.ready),
+            ),
+            completions: _completions.isNotEmpty || _loadingSkills
+                ? _CompletionPicker(
+                    completions: _completions,
+                    loading: _loadingSkills,
+                    onSelected: _selectCompletion,
+                  )
+                : null,
+            onSend: widget.newConversation && !widget.controller.isConnected
+                ? widget.onConnect
+                : _send,
+            sendMode: _sendMode,
+            onAttach: Attachments.supported && !_sending && !_pickingAttachment
+                ? _pickAttachment
+                : null,
           ),
         ],
       );
@@ -729,6 +718,29 @@ class _ConversationViewState extends State<ConversationView> {
     try {
       picked = await Attachments.pick(image: image);
       if (picked == null) return;
+      if (!mounted || draft.disposed || !identical(_draft, draft)) {
+        await Attachments.release(picked);
+        picked = null;
+        return;
+      }
+      if (picked.isImage) {
+        _composerFocus.unfocus();
+        final original = picked;
+        final edited = await editAttachmentImage(context, original);
+        if (edited == null) {
+          await Attachments.release(original);
+          picked = null;
+          return;
+        }
+        if (edited.path != original.path) await Attachments.release(original);
+        picked = edited;
+      }
+      // 编辑期间可能切换主机或销毁草稿；确认归属后才能开始上传。
+      if (!mounted || draft.disposed || !identical(_draft, draft)) {
+        await Attachments.release(picked);
+        picked = null;
+        return;
+      }
       draft.addAttachment(picked);
       picked = null;
       if (mounted && identical(_draft, draft)) _composerFocus.requestFocus();
@@ -737,7 +749,7 @@ class _ConversationViewState extends State<ConversationView> {
       if (mounted && identical(_draft, draft)) _showError(error);
     } finally {
       draft.picking = false;
-      draft.changed();
+      if (!draft.disposed) draft.changed();
     }
   }
 
@@ -1809,6 +1821,8 @@ class _TaskTimelineState extends State<TaskTimeline>
 
   final _scrollController = ScrollController();
   var _followLatest = true;
+  var _userScrollActive = false;
+  var _latestScheduled = false;
   var _showJumpToLatest = false;
   var _requestingOlder = false;
   var _olderLoadArmed = true;
@@ -1825,13 +1839,13 @@ class _TaskTimelineState extends State<TaskTimeline>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_handleScroll);
-    _scheduleLatest(animated: false);
+    _scheduleLatest();
     _scheduleOlderCheck();
   }
 
   @override
   void didChangeMetrics() {
-    if (_followLatest) _scheduleLatest(animated: false);
+    if (_followLatest) _scheduleLatest();
     _scheduleOlderCheck();
   }
 
@@ -1850,7 +1864,7 @@ class _TaskTimelineState extends State<TaskTimeline>
     if (oldWidget.items != widget.items ||
         oldWidget.loading != widget.loading ||
         oldWidget.error != widget.error) {
-      _scheduleLatest(animated: true);
+      _scheduleLatest();
     }
   }
 
@@ -1904,8 +1918,8 @@ class _TaskTimelineState extends State<TaskTimeline>
     }
     if (_automaticPagesSinceGesture >= 10) return;
     final distanceFromOldest =
-        _scrollController.position.maxScrollExtent -
-        _scrollController.position.pixels;
+        _scrollController.position.pixels -
+        _scrollController.position.minScrollExtent;
     if (distanceFromOldest > _olderLoadThreshold) {
       _olderLoadArmed = true;
     } else if (_olderLoadArmed) {
@@ -1921,7 +1935,8 @@ class _TaskTimelineState extends State<TaskTimeline>
             notification.dragDetails != null) ||
         (notification is UserScrollNotification &&
             notification.direction != ScrollDirection.idle)) {
-      // Pause at gesture start, before a streaming update can animate us back.
+      // 拖动和之后的惯性滚动都由用户控制，流式更新不得抢回位置。
+      _userScrollActive = true;
       _automaticPagesSinceGesture = 0;
       _olderLoadArmed = true;
       _anchorRevision++;
@@ -1929,6 +1944,8 @@ class _TaskTimelineState extends State<TaskTimeline>
       return false;
     }
     if (notification is ScrollEndNotification) {
+      if (!_userScrollActive) return false;
+      _userScrollActive = false;
       final atLatest = _distanceFromLatest <= _followThreshold;
       _setScrollState(() {
         _followLatest = atLatest;
@@ -1976,7 +1993,11 @@ class _TaskTimelineState extends State<TaskTimeline>
   }
 
   void _preserveVisibleRow({bool animated = false}) {
-    if (!_scrollController.hasClients) return;
+    if (!_scrollController.hasClients ||
+        _userScrollActive ||
+        _scrollController.position.isScrollingNotifier.value) {
+      return;
+    }
     final viewport = context.findRenderObject();
     if (viewport is! RenderBox || !viewport.hasSize) return;
     final top = viewport.localToGlobal(Offset.zero).dy;
@@ -1995,8 +2016,7 @@ class _TaskTimelineState extends State<TaskTimeline>
     }
     if (anchor == null || before == null) return;
     final revision = ++_anchorRevision;
-    // 停止惯性动画，否则分页布局和惯性滚动会同时修改位置。
-    _scrollController.jumpTo(_scrollController.offset);
+    // 不再通过空跳转停止惯性；仅在用户静止阅读时修正分页或手动展开。
     Duration? started;
     void restore(int remaining) {
       WidgetsBinding.instance.addPostFrameCallback((timestamp) {
@@ -2004,7 +2024,9 @@ class _TaskTimelineState extends State<TaskTimeline>
         if (!mounted ||
             revision != _anchorRevision ||
             !_scrollController.hasClients ||
-            _followLatest) {
+            _followLatest ||
+            _userScrollActive ||
+            _scrollController.position.isScrollingNotifier.value) {
           return;
         }
         final box = anchor!.currentContext?.findRenderObject();
@@ -2013,7 +2035,7 @@ class _TaskTimelineState extends State<TaskTimeline>
         if (delta.abs() > .1) {
           final position = _scrollController.position;
           _scrollController.jumpTo(
-            (position.pixels - delta).clamp(
+            (position.pixels + delta).clamp(
               position.minScrollExtent,
               position.maxScrollExtent,
             ),
@@ -2032,29 +2054,47 @@ class _TaskTimelineState extends State<TaskTimeline>
   }
 
   double get _distanceFromLatest =>
-      _scrollController.position.pixels -
-      _scrollController.position.minScrollExtent;
+      _scrollController.position.maxScrollExtent -
+      _scrollController.position.pixels;
 
-  void _scheduleLatest({required bool animated}) {
+  void _scheduleLatest() {
+    // 同一帧的多次 token / 布局通知只合并成一次跟随，不反复启动动画。
+    if (_latestScheduled) return;
+    _latestScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_followLatest || !_scrollController.hasClients) return;
-      _scrollToLatest(animated: animated);
+      _latestScheduled = false;
+      if (!mounted ||
+          !_followLatest ||
+          _userScrollActive ||
+          !_scrollController.hasClients ||
+          _scrollController.position.isScrollingNotifier.value) {
+        return;
+      }
+      if (_distanceFromLatest > .5) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
     });
   }
 
   void _scrollToLatest({bool animated = true}) {
     if (!_scrollController.hasClients) return;
+    _anchorRevision++;
+    _userScrollActive = false;
     _setScrollState(() {
       _followLatest = true;
       _showJumpToLatest = false;
     });
-    final latest = _scrollController.position.minScrollExtent;
+    final latest = _scrollController.position.maxScrollExtent;
     if (animated && _distanceFromLatest > _followThreshold) {
-      _scrollController.animateTo(
-        latest,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-      );
+      _scrollController
+          .animateTo(
+            latest,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+          )
+          .then((_) {
+            if (mounted) _scheduleLatest();
+          });
     } else {
       _scrollController.jumpTo(latest);
     }
@@ -2102,27 +2142,29 @@ class _TaskTimelineState extends State<TaskTimeline>
           onNotification: _handleScrollNotification,
           child: NotificationListener<ScrollMetricsNotification>(
             onNotification: (notification) {
-              if (notification.depth == 0) _scheduleOlderCheck();
+              if (notification.depth == 0) {
+                _scheduleOlderCheck();
+                if (_followLatest) _scheduleLatest();
+              }
               return false;
             },
             child: SelectionArea(
-              // 短对话从顶部开始；长对话仍使用反向惰性列表保持实时追加稳定。
+              // 按阅读顺序布局：底部新内容增长不会改变上方历史消息的位置。
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ListView.builder(
                   shrinkWrap: true,
                   controller: _scrollController,
-                  reverse: true,
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
                   itemCount: entries.length + 1,
                   findChildIndexCallback: (key) {
                     final index = entries.indexWhere(
                       (entry) => ValueKey(entry.key) == key,
                     );
-                    return index < 0 ? null : entries.length - index - 1;
+                    return index < 0 ? null : index + 1;
                   },
                   itemBuilder: (_, index) {
-                    if (index == entries.length) {
+                    if (index == 0) {
                       return _OlderContextControl(
                         loading: widget.loadingOlder || _requestingOlder,
                         error: widget.olderError,
@@ -2130,7 +2172,7 @@ class _TaskTimelineState extends State<TaskTimeline>
                         onRetry: () => _loadOlder(retry: true),
                       );
                     }
-                    final entryIndex = entries.length - index - 1;
+                    final entryIndex = index - 1;
                     final entry = entries[entryIndex];
                     final previous = entryIndex > 0
                         ? entries[entryIndex - 1]
@@ -2247,9 +2289,11 @@ class _TaskTimelineState extends State<TaskTimeline>
         Expanded(
           child: NotificationListener<ConversationLayoutChange>(
             onNotification: (change) {
-              if (change.userInitiated) _followLatest = false;
-              if (!_followLatest) {
-                _preserveVisibleRow(animated: change.userInitiated);
+              if (change.userInitiated) {
+                _followLatest = false;
+                _preserveVisibleRow(animated: true);
+              } else if (_followLatest) {
+                _scheduleLatest();
               }
               return true;
             },

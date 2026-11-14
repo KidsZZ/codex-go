@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'package:codex_go/domain/conversations/task_message_queue.dart';
@@ -18,6 +20,7 @@ class ConversationComposer extends StatefulWidget {
     required this.onSendOptions,
     required this.settings,
     this.completions,
+    this.maxHeight,
     this.onAttach,
     this.permissionWarning = false,
     this.hasAttachments = false,
@@ -36,6 +39,7 @@ class ConversationComposer extends StatefulWidget {
   final ValueChanged<bool>? onAttach;
   final Widget settings;
   final Widget? completions;
+  final double? maxHeight;
 
   @override
   State<ConversationComposer> createState() => _ConversationComposerState();
@@ -45,10 +49,26 @@ class _ConversationComposerState extends State<ConversationComposer> {
   bool _settingsOpen = false;
   // 编辑框固定在同一父节点下，切换布局时保留焦点、选区和输入法连接。
   final _inputKey = GlobalKey();
+  final _inputScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _inputScroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final budget =
+        widget.maxHeight ??
+        math.max(
+          140,
+          (MediaQuery.sizeOf(context).height -
+                  MediaQuery.viewInsetsOf(context).bottom) *
+              .5,
+        );
+    final completionHeight = widget.completions == null ? 0.0 : budget * .25;
     return SafeArea(
       top: false,
       child: Padding(
@@ -56,7 +76,11 @@ class _ConversationComposerState extends State<ConversationComposer> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (widget.completions != null) widget.completions!,
+            if (widget.completions != null)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: completionHeight),
+                child: widget.completions!,
+              ),
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: widget.controller,
               builder: (context, value, _) {
@@ -71,22 +95,26 @@ class _ConversationComposerState extends State<ConversationComposer> {
                 final canSend =
                     widget.sendEnabled &&
                     (value.text.trim().isNotEmpty || widget.hasAttachments);
-                final available =
-                    MediaQuery.sizeOf(context).height -
-                    MediaQuery.viewInsetsOf(context).bottom;
                 final lineHeight =
                     MediaQuery.textScalerOf(context).scale(16) * 1.5;
-                final maxLines = (available * .28 / lineHeight).floor().clamp(
-                  2,
-                  6,
-                );
+                // 先为设置、操作按钮和安全区留空间，长输入仅在编辑框内部滚动。
+                final chrome =
+                    26 +
+                    MediaQuery.paddingOf(context).bottom +
+                    (expanded ? 44 : 0) +
+                    (_settingsOpen ? 44 : 0) +
+                    completionHeight;
+                final visibleLines = ((budget - chrome - 20) / lineHeight)
+                    .floor()
+                    .clamp(1, 6);
                 final field = TextField(
                   key: _inputKey,
                   controller: widget.controller,
+                  scrollController: _inputScroll,
                   focusNode: widget.focusNode,
                   enabled: widget.inputEnabled,
                   minLines: 1,
-                  maxLines: expanded ? maxLines : 1,
+                  maxLines: expanded ? visibleLines : 1,
                   style: const TextStyle(fontSize: 16, height: 1.5),
                   keyboardType: TextInputType.multiline,
                   textInputAction: TextInputAction.newline,
@@ -210,7 +238,11 @@ class _ConversationComposerState extends State<ConversationComposer> {
                             if (!expanded) attach,
                             Expanded(
                               key: const ValueKey('editor-slot'),
-                              child: field,
+                              child: Scrollbar(
+                                controller: _inputScroll,
+                                thumbVisibility: expanded,
+                                child: field,
+                              ),
                             ),
                             if (!expanded) ...[
                               options,
@@ -222,7 +254,7 @@ class _ConversationComposerState extends State<ConversationComposer> {
                         if (_settingsOpen)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
-                            child: widget.settings,
+                            child: SizedBox(height: 40, child: widget.settings),
                           ),
                         if (expanded)
                           Row(
