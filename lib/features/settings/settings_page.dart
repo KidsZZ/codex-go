@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:codex_go/infrastructure/updates/update_controller.dart';
+import 'package:codex_go/features/updates/update_page.dart';
 import 'package:codex_go/infrastructure/platform/diagnostics.dart';
 import 'package:codex_go/l10n/strings.dart';
 import 'package:codex_go/runtime/codex_runtime.dart';
@@ -78,6 +80,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final c = widget.runtime;
     final l = context.l10n;
+    final updates = UpdateScope.of(context);
     final colors = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
@@ -96,7 +99,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Codex Go',
+                        updates?.channel == 'beta'
+                            ? 'Codex Go Beta'
+                            : 'Codex Go',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 4),
@@ -106,7 +111,9 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       const SizedBox(height: 7),
                       Text(
-                        l.goVersion,
+                        updates?.initialized == true
+                            ? '${updates!.version} (${updates.build})'
+                            : '—',
                         style: TextStyle(color: colors.primary, fontSize: 12),
                       ),
                     ],
@@ -116,6 +123,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ),
+        const UpdateSettingsTile(),
         _label(l.goAppearance),
         Card(
           child: Padding(
@@ -260,7 +268,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   onPressed: () => showLicensePage(
                     context: context,
                     applicationName: 'Codex Go',
-                    applicationVersion: '0.1.0',
+                    applicationVersion: updates?.version,
                     applicationLegalese: '© 2026 Codex Go contributors\nIncludes MIT-licensed Android-SSH-Codex contributions.',
                   ),
                   icon: const Icon(Icons.code, size: 18),

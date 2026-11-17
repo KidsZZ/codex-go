@@ -43,6 +43,7 @@ object ConnectionRuntime {
     /** Replace UI closures so no destroyed Activity is retained by the engine. */
     fun installDetachedHandlers(context: Context, engine: FlutterEngine) {
         val app = context.applicationContext
+        AppUpdates.register(app, engine)
         val messenger = engine.dartExecutor.binaryMessenger
         MethodChannel(messenger, "codex_go/connection_service")
             .setMethodCallHandler { call, result ->

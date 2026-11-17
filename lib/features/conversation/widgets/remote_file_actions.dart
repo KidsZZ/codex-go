@@ -12,12 +12,14 @@ import 'package:codex_go/l10n/strings.dart';
 class RemoteFileActions extends InheritedWidget {
   const RemoteFileActions({
     required this.download,
+    this.enabled = true,
     this.downloadWithProgress,
     this.previewVideo,
     this.cancelDownload,
     required super.child,
     super.key,
   });
+  final bool enabled;
   final Future<bool> Function(String) download;
   final VoidCallback? cancelDownload;
   final Future<bool> Function(
@@ -32,11 +34,15 @@ class RemoteFileActions extends InheritedWidget {
   })?
   previewVideo;
 
-  static RemoteFileActions? maybeOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<RemoteFileActions>();
+  static RemoteFileActions? maybeOf(BuildContext context) {
+    final actions = context
+        .dependOnInheritedWidgetOfExactType<RemoteFileActions>();
+    return actions?.enabled == true ? actions : null;
+  }
 
   @override
   bool updateShouldNotify(RemoteFileActions oldWidget) =>
+      enabled != oldWidget.enabled ||
       download != oldWidget.download ||
       downloadWithProgress != oldWidget.downloadWithProgress ||
       previewVideo != oldWidget.previewVideo ||

@@ -1,15 +1,26 @@
 name: Release
+run-name: '${{ inputs.channel }} · ${{ inputs.source_beta || github.ref_name }}'
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing version tag, for example v0.1.0
+      channel:
+        description: '发布渠道：Beta 自动公开；正式版来自已验收 Beta'
+        type: choice
+        options: [beta, release]
+        default: beta
         required: true
+      source_beta:
+        description: '正式版必填：已验收的 Beta 标签，例如 v0.1.2-beta.1'
         type: string
+        default: ''
+      publish:
+        description: '正式版直接公开（表示已确认发行）；不勾选则生成草稿'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: release-${{ inputs.tag }}
+  group: android-publish
   cancel-in-progress: false
 jobs:
   release:
@@ -18,56 +29,63 @@ jobs:
     environment: release
     permissions:
       contents: write
-    env:
-      RELEASE_TAG: ${{ inputs.tag }}
     steps:
-      - name: Validate tag input
-        shell: bash
-        run: |
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
-            echo 'Expected a version tag such as v0.1.0.' >&2
-            exit 64
-          }
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
-      - name: Verify source version
-        shell: bash
-        run: |
-          version=$(sed -n 's/^version: *\([^+ ]*\).*/\1/p' pubspec.yaml)
-          [[ "$RELEASE_TAG" == "v$version" ]] || {
-            echo 'Tag and pubspec.yaml version do not match.' >&2
-            exit 65
-          }
-          [[ "$(git rev-parse HEAD)" == "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" ]]
+      - name: Resolve immutable source and version
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          SOURCE_BETA: ${{ inputs.source_beta }}
+        run: node tool/release.mjs prepare
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ steps.plan.outputs.source_sha }}
+          persist-credentials: false
       - uses: ./.github/actions/setup-toolchain
       - name: Install locked dependencies
         run: flutter pub get --enforce-lockfile
       - name: Check source
-        run: bash tool/check.sh
+        run: |
+          bash tool/check.sh
+          npm ci --prefix packages/remote_bridge
+          npm run check --prefix packages/remote_bridge
       - name: Configure release signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        shell: bash
         run: |
           umask 077
           dart tool/configure_signing.dart
-      - name: Build and verify release APK
-        run: bash tool/build_android.sh --signed --no-pub
-      - name: Create draft release
+      - name: Build and verify signed APK
+        env:
+          CHANNEL: ${{ steps.plan.outputs.channel }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          BUILD_NUMBER: ${{ steps.plan.outputs.build_number }}
+          CODEX_GO_SOURCE_COMMIT: ${{ steps.plan.outputs.source_sha }}
+          CODEX_GO_SOURCE_BETA: ${{ steps.plan.outputs.source_beta }}
+        run: bash tool/build_android.sh --signed --no-pub --channel "$CHANNEL" --version "$VERSION" --build-number "$BUILD_NUMBER"
+      - name: Publish beta or prepare approved release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        shell: bash
+          TAG: ${{ steps.plan.outputs.tag }}
+          CHANNEL: ${{ steps.plan.outputs.channel }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          SOURCE: ${{ steps.plan.outputs.source_sha }}
+          PUBLISH: ${{ inputs.publish }}
         run: |
-          gh release create "$RELEASE_TAG" \
-            build/artifacts/*-release.apk build/artifacts/*-release.apk.sha256 \
-            --verify-tag --draft --generate-notes --title "Codex Go $RELEASE_TAG"
+          extra=()
+          if [[ "$CHANNEL" == beta ]]; then extra+=(--prerelease --latest=false)
+          elif [[ "$PUBLISH" != true ]]; then extra+=(--draft)
+          else extra+=(--latest); fi
+          apk="build/artifacts/codex-go-$VERSION-arm64-v8a-$CHANNEL.apk"
+          gh release create "$TAG" "$apk" "$apk.sha256" build/artifacts/update.json \
+            --target "$SOURCE" --generate-notes --title "Codex Go $TAG" "${extra[@]}"
       - name: Remove temporary signing material
         if: always()
-        shell: bash
         run: rm -f android/key.properties build/ci-signing/release.jks

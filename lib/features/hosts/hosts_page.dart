@@ -1,3 +1,5 @@
+import 'relay_pairing_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:codex_go/infrastructure/storage/host_profile.dart';
 import 'package:codex_go/l10n/strings.dart';
@@ -40,6 +42,16 @@ class _HostsPageState extends State<HostsPage> {
     } finally {
       if (mounted) setState(() => _mutating = false);
     }
+  }
+
+  Future<void> _pair() async {
+    if (_mutating || _connecting) return;
+    final profile = await Navigator.of(context).push<HostProfile>(
+      MaterialPageRoute(
+        builder: (_) => RelayPairingPage(runtime: widget.runtime),
+      ),
+    );
+    if (profile != null && mounted) await _connect(profile);
   }
 
   Future<void> _remove(HostProfile profile) async {
@@ -94,10 +106,20 @@ class _HostsPageState extends State<HostsPage> {
         GoSectionHeading(
           l.navHosts,
           subtitle: l.goConnectionHint,
-          trailing: IconButton.filled(
-            onPressed: _mutating || _connecting ? null : _edit,
-            tooltip: l.addHost,
-            icon: const Icon(Icons.add),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: _mutating || _connecting ? null : _pair,
+                tooltip: l.relayPairTitle,
+                icon: const Icon(Icons.qr_code_scanner),
+              ),
+              IconButton.filled(
+                onPressed: _mutating || _connecting ? null : _edit,
+                tooltip: l.addHost,
+                icon: const Icon(Icons.add),
+              ),
+            ],
           ),
         ),
         if (_mutating) const LinearProgressIndicator(minHeight: 2),
@@ -135,7 +157,9 @@ class _HostsPageState extends State<HostsPage> {
                           onRemove: _mutating || _connecting
                               ? null
                               : () => _remove(profile),
-                          onPorts: c.selectedHostId == profile.id
+                          onPorts:
+                              profile.relay == null &&
+                                  c.selectedHostId == profile.id
                               ? () => showPortForwards(context, c)
                               : null,
                         ),
@@ -230,7 +254,8 @@ class _HostCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${profile.user}@${profile.hostName}:${profile.port}',
+                            profile.relay?.url ??
+                                '${profile.user}@${profile.hostName}:${profile.port}',
                             style: TextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
@@ -246,7 +271,12 @@ class _HostCard extends StatelessWidget {
                       onSelected: (value) =>
                           value == 'edit' ? onEdit?.call() : onRemove?.call(),
                       itemBuilder: (_) => [
-                        PopupMenuItem(value: 'edit', child: Text(l.editHost)),
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Text(
+                            profile.relay == null ? l.editHost : l.relayDetails,
+                          ),
+                        ),
                         PopupMenuItem(value: 'remove', child: Text(l.remove)),
                       ],
                     ),
@@ -259,11 +289,13 @@ class _HostCard extends StatelessWidget {
                   children: [
                     _Tag(
                       icon: Icons.terminal_rounded,
-                      label: switch (profile.appServerMode) {
-                        AppServerMode.shared => l.sharedMode,
-                        AppServerMode.custom => l.customMode,
-                        AppServerMode.isolated => l.isolatedMode,
-                      },
+                      label: profile.relay != null
+                          ? l.relayEncrypted
+                          : switch (profile.appServerMode) {
+                              AppServerMode.shared => l.sharedMode,
+                              AppServerMode.custom => l.customMode,
+                              AppServerMode.isolated => l.isolatedMode,
+                            },
                     ),
                     if (active)
                       _Tag(

@@ -1,3 +1,4 @@
+import 'package:codex_go/infrastructure/relay/relay_endpoint.dart';
 // 基于 Android-SSH-Codex 的已验证实现改编；原作者版权与 MIT 许可见 LICENSE。
 import 'package:collection/collection.dart';
 
@@ -50,12 +51,26 @@ final class JumpHostProfile {
 }
 
 final class HostProfile {
+  /// 配对连接保留独立的传输配置；SSH 字段不参与中转认证。
+  factory HostProfile.paired({
+    required String id,
+    required String label,
+    required RelayEndpoint relay,
+  }) => HostProfile(
+    id: id,
+    label: label,
+    hostName: Uri.parse(relay.url).host,
+    user: '',
+    port: Uri.parse(relay.url).port,
+    relay: relay,
+  );
   factory HostProfile({
     required String id,
     required String label,
     required String hostName,
     required String user,
     required int port,
+    RelayEndpoint? relay,
     HostAuthMethod authMethod = HostAuthMethod.password,
     String? identityFileHint,
     JumpHostProfile? proxyJump,
@@ -69,6 +84,7 @@ final class HostProfile {
     hostName: hostName,
     user: user,
     port: port,
+    relay: relay,
     authMethod: authMethod,
     identityFileHint: identityFileHint,
     proxyJump: proxyJump,
@@ -84,6 +100,7 @@ final class HostProfile {
     required this.hostName,
     required this.user,
     required this.port,
+    required this.relay,
     required this.authMethod,
     required this.identityFileHint,
     required this.proxyJump,
@@ -123,42 +140,52 @@ final class HostProfile {
           ),
   );
 
-  factory HostProfile.fromJson(Map<String, dynamic> json) => HostProfile(
-    id: json['id'] as String,
-    label: json['label'] as String,
-    hostName: json['hostName'] as String,
-    user: json['user'] as String,
-    port: json['port'] as int? ?? 22,
-    authMethod: HostAuthMethod.values.firstWhere(
-      (value) => value.name == json['authMethod'],
-      orElse: () => HostAuthMethod.password,
-    ),
-    identityFileHint: json['identityFileHint'] as String?,
-    environment: json['environment'] is Map
-        ? (json['environment'] as Map).cast<String, String>()
-        : const {},
-    appServerMode: AppServerMode.values.firstWhere(
-      (value) => value.name == json['appServerMode'],
-      orElse: () => AppServerMode.shared,
-    ),
-    customAppServerSocket: json['customAppServerSocket'] as String?,
-    sshOptions: json['sshOptions'] is Map
-        ? SshConnectionOptions.fromJson(
-            (json['sshOptions'] as Map).cast<String, dynamic>(),
-          )
-        : const SshConnectionOptions(),
-    proxyJump: json['proxyJump'] is Map
-        ? JumpHostProfile.fromJson(
-            (json['proxyJump'] as Map).cast<String, dynamic>(),
-          )
-        : null,
-  );
+  factory HostProfile.fromJson(Map<String, dynamic> json) =>
+      json['relay'] is Map
+      ? HostProfile.paired(
+          id: json['id'] as String,
+          label: json['label'] as String,
+          relay: RelayEndpoint.fromJson(
+            (json['relay'] as Map).cast<String, dynamic>(),
+          ),
+        )
+      : HostProfile(
+          id: json['id'] as String,
+          label: json['label'] as String,
+          hostName: json['hostName'] as String,
+          user: json['user'] as String,
+          port: json['port'] as int? ?? 22,
+          authMethod: HostAuthMethod.values.firstWhere(
+            (value) => value.name == json['authMethod'],
+            orElse: () => HostAuthMethod.password,
+          ),
+          identityFileHint: json['identityFileHint'] as String?,
+          environment: json['environment'] is Map
+              ? (json['environment'] as Map).cast<String, String>()
+              : const {},
+          appServerMode: AppServerMode.values.firstWhere(
+            (value) => value.name == json['appServerMode'],
+            orElse: () => AppServerMode.shared,
+          ),
+          customAppServerSocket: json['customAppServerSocket'] as String?,
+          sshOptions: json['sshOptions'] is Map
+              ? SshConnectionOptions.fromJson(
+                  (json['sshOptions'] as Map).cast<String, dynamic>(),
+                )
+              : const SshConnectionOptions(),
+          proxyJump: json['proxyJump'] is Map
+              ? JumpHostProfile.fromJson(
+                  (json['proxyJump'] as Map).cast<String, dynamic>(),
+                )
+              : null,
+        );
 
   final String id;
   final String label;
   final String hostName;
   final String user;
   final int port;
+  final RelayEndpoint? relay;
   final HostAuthMethod authMethod;
   final String? identityFileHint;
   final JumpHostProfile? proxyJump;
@@ -189,6 +216,7 @@ final class HostProfile {
     bool clearCustomAppServerSocket = false,
     SshConnectionOptions? sshOptions,
   }) => HostProfile(
+    relay: relay,
     id: id ?? this.id,
     label: label ?? this.label,
     hostName: hostName ?? this.hostName,
@@ -205,26 +233,30 @@ final class HostProfile {
         : customAppServerSocket ?? this.customAppServerSocket,
   );
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'label': label,
-    'hostName': hostName,
-    'user': user,
-    'port': port,
-    'authMethod': authMethod.name,
-    if (sshOptions != const SshConnectionOptions())
-      'sshOptions': sshOptions.toJson(),
-    if (identityFileHint != null) 'identityFileHint': identityFileHint,
-    if (proxyJump != null) 'proxyJump': proxyJump!.toJson(),
-    if (environment.isNotEmpty) 'environment': environment,
-    'appServerMode': appServerMode.name,
-    if (appServerMode == AppServerMode.custom && customAppServerSocket != null)
-      'customAppServerSocket': customAppServerSocket,
-  };
+  Map<String, dynamic> toJson() => relay != null
+      ? {'id': id, 'label': label, 'relay': relay!.toJson()}
+      : {
+          'id': id,
+          'label': label,
+          'hostName': hostName,
+          'user': user,
+          'port': port,
+          'authMethod': authMethod.name,
+          if (sshOptions != const SshConnectionOptions())
+            'sshOptions': sshOptions.toJson(),
+          if (identityFileHint != null) 'identityFileHint': identityFileHint,
+          if (proxyJump != null) 'proxyJump': proxyJump!.toJson(),
+          if (environment.isNotEmpty) 'environment': environment,
+          'appServerMode': appServerMode.name,
+          if (appServerMode == AppServerMode.custom &&
+              customAppServerSocket != null)
+            'customAppServerSocket': customAppServerSocket,
+        };
 
   @override
   bool operator ==(Object other) =>
       other is HostProfile &&
+      other.relay == relay &&
       other.id == id &&
       other.label == label &&
       other.hostName == hostName &&
@@ -243,6 +275,7 @@ final class HostProfile {
 
   @override
   int get hashCode => Object.hash(
+    relay,
     id,
     label,
     hostName,
@@ -260,6 +293,7 @@ final class HostProfile {
 
 final class HostSecret {
   const HostSecret({
+    this.relayPrivateKey,
     this.password,
     this.privateKey,
     this.passphrase,
@@ -268,6 +302,7 @@ final class HostSecret {
     this.jumpPassphrase,
   });
 
+  final String? relayPrivateKey;
   final String? password;
   final String? privateKey;
   final String? passphrase;
@@ -276,10 +311,12 @@ final class HostSecret {
   final String? jumpPassphrase;
 
   bool get isEmpty =>
+      (relayPrivateKey == null || relayPrivateKey!.isEmpty) &&
       (password == null || password!.isEmpty) &&
       (privateKey == null || privateKey!.isEmpty);
 
   Map<String, dynamic> toJson() => {
+    if (relayPrivateKey != null) 'relayPrivateKey': relayPrivateKey,
     if (password != null) 'password': password,
     if (privateKey != null) 'privateKey': privateKey,
     if (passphrase != null) 'passphrase': passphrase,
@@ -289,6 +326,7 @@ final class HostSecret {
   };
 
   factory HostSecret.fromJson(Map<String, dynamic> json) => HostSecret(
+    relayPrivateKey: json['relayPrivateKey'] as String?,
     password: json['password'] as String?,
     privateKey: json['privateKey'] as String?,
     passphrase: json['passphrase'] as String?,

@@ -12,6 +12,11 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
+      'ds-harness-remote',
+    ], await rootBundle.loadString('assets/licenses/ds-harness-remote.txt'));
+  });
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
       'Android-SSH-Codex',
     ], await rootBundle.loadString('assets/licenses/android-ssh-codex.txt'));
     yield LicenseEntryWithLineBreaks([

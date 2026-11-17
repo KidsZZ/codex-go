@@ -1,3 +1,4 @@
+import 'package:codex_go/infrastructure/relay/relay_endpoint.dart';
 import 'package:flutter/material.dart';
 import 'package:codex_go/infrastructure/storage/host_profile.dart';
 import 'package:codex_go/l10n/strings.dart';
@@ -11,6 +12,27 @@ Future<void> editHostProfile(
   CodexRuntime runtime, {
   HostProfile? profile,
 }) async {
+  if (profile?.relay case final relay?) {
+    final l = context.l10n;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l.relayDetails),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            '${relay.url}\n\n${l.relayComputerFingerprint}\n${relayFingerprint(relay.hostKey)}\n\n${l.relayDemoScope}',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l.cancel),
+          ),
+        ],
+      ),
+    );
+    return;
+  }
   final secret = profile == null
       ? const HostSecret()
       : await runtime.readSecret(profile.id);

@@ -2,6 +2,8 @@ import 'package:codex_go/features/hosts/host_actions.dart';
 
 import 'dart:async';
 
+import 'package:codex_go/features/updates/update_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:codex_go/domain/conversations/task_reducer.dart';
 import 'package:codex_go/features/conversation/conversation_view.dart';
@@ -246,10 +248,15 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
                     onDestinationSelected: (index) =>
                         _navigation.select(GoDestination.values[index]),
                     destinations: [
-                      for (final (_, label, icon, selected) in destinations)
+                      for (final (destination, label, icon, selected)
+                          in destinations)
                         NavigationDestination(
-                          icon: Icon(icon),
-                          selectedIcon: Icon(selected),
+                          icon: destination == GoDestination.settings
+                              ? UpdateBadge(child: Icon(icon))
+                              : Icon(icon),
+                          selectedIcon: destination == GoDestination.settings
+                              ? UpdateBadge(child: Icon(selected))
+                              : Icon(selected),
                           label: label,
                         ),
                     ],
@@ -282,11 +289,22 @@ class _WorkspaceShellState extends State<WorkspaceShell> {
                                   child: GoMark(size: 38),
                                 ),
                                 destinations: [
-                                  for (final (_, label, icon, selected)
+                                  for (final (
+                                        destination,
+                                        label,
+                                        icon,
+                                        selected,
+                                      )
                                       in destinations)
                                     NavigationRailDestination(
-                                      icon: Icon(icon),
-                                      selectedIcon: Icon(selected),
+                                      icon:
+                                          destination == GoDestination.settings
+                                          ? UpdateBadge(child: Icon(icon))
+                                          : Icon(icon),
+                                      selectedIcon:
+                                          destination == GoDestination.settings
+                                          ? UpdateBadge(child: Icon(selected))
+                                          : Icon(selected),
                                       label: Text(label),
                                     ),
                                 ],

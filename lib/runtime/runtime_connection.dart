@@ -164,76 +164,91 @@ extension RuntimeConnection on CodexRuntime {
         _taskCatalog.clear();
         _historyLoadState.clear();
       }
-      stage = ConnectionStage.ssh;
-      ssh = await setup.run<SshConnection>(
-        stage.name,
-        () => _connector.connect(
-          profile,
-          secret,
-          prompt: (challenge) {
-            if (attempt != _connectionAttempt) return Future.value(false);
-            return _promptForHostKey(challenge);
-          },
-          diagnosticAttempt: attempt,
-          setup: setup,
-        ),
-        timeout: profile.sshOptions.setupTimeout(
-          hasJumpHost: profile.proxyJump != null,
-        ),
-        closeLateResult: (connection) =>
-            connection.close(reason: 'late_connection_setup_result'),
-      );
-      if (attempt != _connectionAttempt) return;
-      stage = ConnectionStage.remoteAppServer;
-      final client = ssh.client;
-      final socketPath = await setup.run(
-        stage.name,
-        () => resolveCodexSocketForProfile((command, {environment}) async {
-          final commandWatch = Stopwatch()..start();
-          final result = await client.runWithResult(
-            command,
-            environment: environment,
-          );
-          Diagnostics.record('bootstrap.commandResult', {
-            'attempt': attempt,
-            'mode': profile.appServerMode.name,
-            'durationMs': commandWatch.elapsedMilliseconds,
-            'exitCode': result.exitCode,
-            'exitSignal': result.exitSignal?.signalName,
-            'stdoutBytes': result.stdout.length,
-            'stderrBytes': result.stderr.length,
-          });
-          return SshCommandResult(
-            stdout: result.stdout,
-            stderr: result.stderr,
-            exitCode: result.exitCode,
-            exitSignal: result.exitSignal?.signalName,
-          );
-        }, profile),
-      );
-      if (attempt != _connectionAttempt) return;
-      stage = ConnectionStage.unixTunnel;
-      tunnel = await setup.run<SshUnixTunnel>(
-        stage.name,
-        () => SshUnixTunnel.start(
-          client,
-          socketPath,
-          environment: profile.environment,
-        ),
-        closeLateResult: (value) => value.close(),
-      );
-      if (attempt != _connectionAttempt) return;
-      stage = ConnectionStage.rpcTunnel;
-      final activeTunnel = tunnel;
-      setup.watchClosed(activeTunnel.firstFailure, () {});
-      final transport = await setup.run(
-        stage.name,
-        () => WebSocketRpcTransport.connect(
-          Uri.parse('ws://127.0.0.1:${activeTunnel.localPort}/'),
-        ),
-        closeLateResult: (value) =>
-            boundedConnectionCleanup('lateWebSocket', value.close),
-      );
+      final RpcTransport transport;
+      if (profile.relay case final relay?) {
+        stage = ConnectionStage.rpcTunnel;
+        transport = await setup.run(
+          'encryptedRelay',
+          () => RelayRpcTransport.connect(
+            endpoint: relay,
+            privateKey:
+                secret.relayPrivateKey ??
+                (throw StateError('Missing paired device identity')),
+          ),
+          closeLateResult: (value) => value.close(),
+        );
+      } else {
+        stage = ConnectionStage.ssh;
+        ssh = await setup.run<SshConnection>(
+          stage.name,
+          () => _connector.connect(
+            profile,
+            secret,
+            prompt: (challenge) {
+              if (attempt != _connectionAttempt) return Future.value(false);
+              return _promptForHostKey(challenge);
+            },
+            diagnosticAttempt: attempt,
+            setup: setup,
+          ),
+          timeout: profile.sshOptions.setupTimeout(
+            hasJumpHost: profile.proxyJump != null,
+          ),
+          closeLateResult: (connection) =>
+              connection.close(reason: 'late_connection_setup_result'),
+        );
+        if (attempt != _connectionAttempt) return;
+        stage = ConnectionStage.remoteAppServer;
+        final client = ssh.client;
+        final socketPath = await setup.run(
+          stage.name,
+          () => resolveCodexSocketForProfile((command, {environment}) async {
+            final commandWatch = Stopwatch()..start();
+            final result = await client.runWithResult(
+              command,
+              environment: environment,
+            );
+            Diagnostics.record('bootstrap.commandResult', {
+              'attempt': attempt,
+              'mode': profile.appServerMode.name,
+              'durationMs': commandWatch.elapsedMilliseconds,
+              'exitCode': result.exitCode,
+              'exitSignal': result.exitSignal?.signalName,
+              'stdoutBytes': result.stdout.length,
+              'stderrBytes': result.stderr.length,
+            });
+            return SshCommandResult(
+              stdout: result.stdout,
+              stderr: result.stderr,
+              exitCode: result.exitCode,
+              exitSignal: result.exitSignal?.signalName,
+            );
+          }, profile),
+        );
+        if (attempt != _connectionAttempt) return;
+        stage = ConnectionStage.unixTunnel;
+        tunnel = await setup.run<SshUnixTunnel>(
+          stage.name,
+          () => SshUnixTunnel.start(
+            client,
+            socketPath,
+            environment: profile.environment,
+          ),
+          closeLateResult: (value) => value.close(),
+        );
+        if (attempt != _connectionAttempt) return;
+        stage = ConnectionStage.rpcTunnel;
+        final activeTunnel = tunnel;
+        setup.watchClosed(activeTunnel.firstFailure, () {});
+        transport = await setup.run(
+          stage.name,
+          () => WebSocketRpcTransport.connect(
+            Uri.parse('ws://127.0.0.1:${activeTunnel.localPort}/'),
+          ),
+          closeLateResult: (value) =>
+              boundedConnectionCleanup('lateWebSocket', value.close),
+        );
+      }
       rpc = JsonRpcClient(transport)..start();
       setup.watchClosed(rpc.done, () {});
       final api = CodexRemoteApi(rpc);
@@ -275,13 +290,16 @@ extension RuntimeConnection on CodexRuntime {
       if (attempt != _connectionAttempt) return;
       _connectionPhase = RemoteConnectionPhase.connected;
       // Optional forwarding failures are isolated from chat connectivity.
-      unawaited(
-        portForwards.attach(
-          profile.id,
-          (host, port) async =>
-              SshPortForwardChannel(await ssh!.client.forwardLocal(host, port)),
-        ),
-      );
+      if (ssh != null) {
+        unawaited(
+          portForwards.attach(
+            profile.id,
+            (host, port) async => SshPortForwardChannel(
+              await ssh!.client.forwardLocal(host, port),
+            ),
+          ),
+        );
+      }
       setup.dispose();
       if (identical(_openingAttempt, setup)) _openingAttempt = null;
       accountUsage.bind(api);
@@ -463,7 +481,8 @@ extension RuntimeConnection on CodexRuntime {
     final attempt = _connectionAttempt;
     final epoch = _epoch;
     try {
-      final sshHealthy = await _ssh?.checkHealth() ?? false;
+      final sshHealthy =
+          profile.relay != null || (await _ssh?.checkHealth() ?? false);
       final disconnected =
           !sshHealthy || await foregroundTransportDisconnected(rpc);
       if (!_isCurrentSession(api, attempt, epoch, profile.id)) return;
@@ -566,7 +585,8 @@ extension RuntimeConnection on CodexRuntime {
     final attempt = _connectionAttempt;
     final epoch = _epoch;
     try {
-      final sshHealthy = await _ssh?.checkHealth() ?? false;
+      final sshHealthy =
+          profile.relay != null || (await _ssh?.checkHealth() ?? false);
       final disconnected =
           !sshHealthy || await foregroundTransportDisconnected(rpc);
       if (!_isCurrentSession(api, attempt, epoch, profile.id) ||

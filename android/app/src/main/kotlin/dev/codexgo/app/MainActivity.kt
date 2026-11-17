@@ -48,6 +48,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        AppUpdates.register(this, flutterEngine, this)
         attachmentPicker = AttachmentPicker(this)
         attachmentDownloads = AttachmentDownloads(this)
         connectionDiagnostics = ConnectionRuntime.observer()

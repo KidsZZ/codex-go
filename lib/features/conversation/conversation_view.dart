@@ -265,6 +265,7 @@ class _ConversationViewState extends State<ConversationView> {
           ),
           Expanded(
             child: RemoteFileActions(
+              enabled: widget.controller.canTransferFiles,
               download: widget.controller.downloadFile,
               downloadWithProgress: widget.controller.downloadFile,
               previewVideo: Attachments.supported
@@ -489,7 +490,11 @@ class _ConversationViewState extends State<ConversationView> {
                 ? widget.onConnect
                 : _send,
             sendMode: _sendMode,
-            onAttach: Attachments.supported && !_sending && !_pickingAttachment
+            onAttach:
+                Attachments.supported &&
+                    widget.controller.canTransferFiles &&
+                    !_sending &&
+                    !_pickingAttachment
                 ? _pickAttachment
                 : null,
           ),
@@ -1750,6 +1755,7 @@ class _SubagentHistoryState extends State<_SubagentHistory> {
           ),
           Expanded(
             child: RemoteFileActions(
+              enabled: controller.canTransferFiles,
               download: controller.downloadFile,
               downloadWithProgress: controller.downloadFile,
               previewVideo: Attachments.supported

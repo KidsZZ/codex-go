@@ -1,3 +1,6 @@
+import 'package:codex_go/infrastructure/relay/relay_rpc_transport.dart';
+import 'package:codex_go/infrastructure/codex/rpc_transport.dart';
+
 // 基于 Android-SSH-Codex 的已验证实现改编；原作者版权与 MIT 许可见 LICENSE。
 import 'dart:async';
 import 'dart:io';
@@ -238,6 +241,7 @@ final class CodexRuntime extends ChangeNotifier {
   List<RemoteModel> _models = const [];
   final AccountUsageController accountUsage = AccountUsageController();
   final PortForwardManager portForwards = PortForwardManager();
+  bool get canTransferFiles => isConnected && _ssh != null;
   bool get canDiscoverPorts =>
       isConnected && _ssh != null && _workspaceHostId == _selectedHostId;
 

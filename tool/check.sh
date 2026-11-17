@@ -6,5 +6,5 @@ command -v flutter >/dev/null || { echo '缺少 Flutter，请先配置 PATH。' 
 flutter gen-l10n
 dart format --output=none --set-exit-if-changed \
   lib/app lib/domain lib/features lib/infrastructure lib/runtime lib/shared \
-  lib/l10n/strings.dart lib/main.dart tool/configure_signing.dart
+  lib/l10n/strings.dart lib/main.dart tool/configure_signing.dart tool/generate_update_manifest.dart tool/relay_probe.dart
 flutter analyze --no-pub
